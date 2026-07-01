@@ -24,7 +24,7 @@ function roundRect(ctx: any, x: number, y: number, w: number, h: number, r: numb
   ctx.closePath();
 }
 
-export async function generateWelcomeImage(member: GuildMember): Promise<Buffer> {
+export async function generateWelcomeImage(member: GuildMember, welcomeText: string): Promise<Buffer> {
   const canvas = createCanvas(WIDTH, HEIGHT);
   const ctx = canvas.getContext("2d");
 
@@ -77,16 +77,17 @@ export async function generateWelcomeImage(member: GuildMember): Promise<Buffer>
 
   ctx.textAlign = "center";
   ctx.fillStyle = "#26215C";
-  ctx.font = "bold 36px sans-serif";
-  ctx.fillText(`Bienvenue, ${member.user.username} !`, WIDTH / 2, avatarY + avatarSize + 55);
+  let fontSize = 36;
+  ctx.font = `bold ${fontSize}px sans-serif`;
+  while (ctx.measureText(welcomeText).width > WIDTH - 80 && fontSize > 18) {
+    fontSize -= 2;
+    ctx.font = `bold ${fontSize}px sans-serif`;
+  }
+  ctx.fillText(welcomeText, WIDTH / 2, avatarY + avatarSize + 55);
 
-  ctx.font = "24px sans-serif";
+  ctx.font = "22px sans-serif";
   ctx.fillStyle = "#534AB7";
-  ctx.fillText(
-    `${member.guild.name} - Membre n${member.guild.memberCount}`,
-    WIDTH / 2,
-    avatarY + avatarSize + 90,
-  );
+  ctx.fillText(`Membre n${member.guild.memberCount}`, WIDTH / 2, avatarY + avatarSize + 88);
 
   return canvas.toBuffer("image/png");
 }

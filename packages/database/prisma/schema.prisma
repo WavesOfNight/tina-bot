@@ -33,6 +33,7 @@ model Guild {
   levelRewards       LevelReward[]
   moderationCases    ModerationCase[]
   customCommands     CustomCommand[]
+  autoResponses      AutoResponse[]
   giveaways          Giveaway[]
   reactionRoleMsgs   ReactionRoleMessage[]
   gameStats          GameStat[]
@@ -46,6 +47,7 @@ model WelcomeConfig {
   channelId           String?
   message             String   @default("{user.mention} a rejoint le serveur {server.name} !")
   imageEnabled        Boolean  @default(true)
+  imageText           String   @default("Bienvenue {user} !")
   dmEnabled           Boolean  @default(false)
   dmMessage           String   @default("Bienvenue sur {server.name}, {user.name} !")
   reactionRoleEnabled Boolean  @default(false)
@@ -53,6 +55,19 @@ model WelcomeConfig {
   autoRoleEnabled     Boolean  @default(false)
   autoRoleId          String?
   updatedAt           DateTime @updatedAt
+}
+
+model AutoResponse {
+  id        Int      @id @default(autoincrement())
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId   String
+  trigger   String
+  response  String
+  matchType String   @default("CONTAINS")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([guildId])
 }
 
 model Member {

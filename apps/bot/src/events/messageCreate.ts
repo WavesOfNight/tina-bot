@@ -1,6 +1,7 @@
 import { Events, type Message, type TextChannel } from "discord.js";
 import { prisma } from "@tina/database";
 import { grantMessageXp } from "../lib/xp.js";
+import { findAutoResponseMatch } from "../lib/auto-response.js";
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -29,15 +30,22 @@ export async function execute(message: Message) {
 
   const guildData = await prisma.guild.findUnique({ where: { id: message.guild.id } });
   const prefix = guildData?.prefix ?? "!";
-  if (!message.content.startsWith(prefix)) return;
 
-  const commandName = message.content.slice(prefix.length).trim().split(/\s+/)[0]?.toLowerCase();
-  if (!commandName) return;
+  if (message.content.startsWith(prefix)) {
+    const commandName = message.content.slice(prefix.length).trim().split(/\s+/)[0]?.toLowerCase();
+    if (commandName) {
+      const customCommand = await prisma.customCommand.findUnique({
+        where: { guildId_name: { guildId: message.guild.id, name: commandName } },
+      });
+      if (customCommand) {
+        await channel.send(customCommand.response).catch(() => null);
+        return;
+      }
+    }
+  }
 
-  const customCommand = await prisma.customCommand.findUnique({
-    where: { guildId_name: { guildId: message.guild.id, name: commandName } },
-  });
-  if (customCommand) {
-    await channel.send(customCommand.response).catch(() => null);
+  const autoResponse = await findAutoResponseMatch(message.guild.id, message.content);
+  if (autoResponse) {
+    await channel.send(autoResponse.response).catch(() => null);
   }
 }

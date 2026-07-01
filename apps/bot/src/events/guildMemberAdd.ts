@@ -18,16 +18,20 @@ export async function execute(member: GuildMember) {
   if (config.channelId) {
     const channel = (await member.guild.channels.fetch(config.channelId).catch(() => null)) as TextChannel | null;
     if (channel?.isTextBased()) {
-      const content = applyPlaceholders(config.message, member, member.guild);
       const files = [];
+      let content: string | undefined;
 
       if (config.imageEnabled) {
         try {
-          const buffer = await generateWelcomeImage(member);
+          const welcomeText = applyPlaceholders(config.imageText, member, member.guild);
+          const buffer = await generateWelcomeImage(member, welcomeText);
           files.push(new AttachmentBuilder(buffer, { name: "bienvenue.png" }));
         } catch {
-          // Image generation failed (e.g. avatar unreachable); still send the text welcome.
+          // Image generation failed (e.g. avatar unreachable); fall back to the text welcome.
+          content = applyPlaceholders(config.message, member, member.guild);
         }
+      } else {
+        content = applyPlaceholders(config.message, member, member.guild);
       }
 
       const components = [];

@@ -8,8 +8,9 @@ async function saveWelcomeConfig(guildId: string, formData: FormData) {
 
   const channelId = (formData.get("channelId") as string) || null;
   const message = (formData.get("message") as string) || "{user.mention} a rejoint le serveur {server.name} !";
+  const imageText = (formData.get("imageText") as string) || "Bienvenue {user} !";
   const dmMessage = (formData.get("dmMessage") as string) || "Bienvenue sur {server.name}, {user.name} !";
-  const imageEnabled = formData.get("imageEnabled") === "on";
+  const imageEnabled = formData.get("welcomeType") === "image";
   const dmEnabled = formData.get("dmEnabled") === "on";
   const reactionRoleEnabled = formData.get("reactionRoleEnabled") === "on";
   const reactionRoleId = (formData.get("reactionRoleId") as string) || null;
@@ -18,8 +19,8 @@ async function saveWelcomeConfig(guildId: string, formData: FormData) {
 
   await prisma.welcomeConfig.upsert({
     where: { guildId },
-    create: { guildId, channelId, message, dmMessage, imageEnabled, dmEnabled, reactionRoleEnabled, reactionRoleId, autoRoleEnabled, autoRoleId },
-    update: { channelId, message, dmMessage, imageEnabled, dmEnabled, reactionRoleEnabled, reactionRoleId, autoRoleEnabled, autoRoleId },
+    create: { guildId, channelId, message, imageText, dmMessage, imageEnabled, dmEnabled, reactionRoleEnabled, reactionRoleId, autoRoleEnabled, autoRoleId },
+    update: { channelId, message, imageText, dmMessage, imageEnabled, dmEnabled, reactionRoleEnabled, reactionRoleId, autoRoleEnabled, autoRoleId },
   });
 
   revalidatePath(`/dashboard/${guildId}/bienvenue`);
@@ -84,17 +85,31 @@ export default async function BienvenuePage({ params }: { params: { guildId: str
             ))}
           </select>
 
-          <label className="mb-1 block text-xs text-lavender-600">Message dans le salon</label>
+          <label className="mb-1 block text-xs text-lavender-600">Type de bienvenue</label>
+          <div className="mb-3 flex gap-4">
+            <label className="flex items-center gap-1.5 text-sm text-lavender-800">
+              <input type="radio" name="welcomeType" value="text" defaultChecked={!(config?.imageEnabled ?? true)} /> Texte
+            </label>
+            <label className="flex items-center gap-1.5 text-sm text-lavender-800">
+              <input type="radio" name="welcomeType" value="image" defaultChecked={config?.imageEnabled ?? true} /> Image
+            </label>
+          </div>
+
+          <label className="mb-1 block text-xs text-lavender-600">Message dans le salon (mode Texte)</label>
           <textarea
             name="message"
             defaultValue={config?.message ?? "{user.mention} a rejoint le serveur {server.name} !"}
-            rows={3}
+            rows={2}
             className="mb-4 w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
           />
 
-          <label className="mb-1 flex items-center gap-2 text-xs text-lavender-600">
-            <input type="checkbox" name="imageEnabled" defaultChecked={config?.imageEnabled ?? true} /> Image de bienvenue generee
-          </label>
+          <label className="mb-1 block text-xs text-lavender-600">Texte sur l&apos;image (mode Image)</label>
+          <input
+            name="imageText"
+            defaultValue={config?.imageText ?? "Bienvenue {user} !"}
+            className="mb-1 w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+          />
+          <p className="text-[11px] text-lavender-500">Variables : {"{user}"} (pseudo), {"{server}"} (nom du serveur)</p>
         </div>
 
         <div className="glass-panel rounded-aero p-5 shadow-glass">
