@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model BotConfig {
+  id             Int      @id @default(1)
+  clientId       String
+  tokenEncrypted String
+  updatedAt      DateTime @updatedAt
+}
+
+model Guild {
+  id             String   @id
+  name           String?
+  prefix         String   @default("!")
+  modLogChannelId String?
+  createdAt      DateTime @default(now())
+
+  welcomeConfig      WelcomeConfig?
+  members            Member[]
+  levelRewards       LevelReward[]
+  moderationCases    ModerationCase[]
+  customCommands     CustomCommand[]
+  giveaways          Giveaway[]
+  reactionRoleMsgs   ReactionRoleMessage[]
+  gameStats          GameStat[]
+  slashCommandToggle SlashCommandToggle[]
+}
+
+model WelcomeConfig {
+  id                  Int      @id @default(autoincrement())
+  guild               Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId             String   @unique
+  channelId           String?
+  message             String   @default("{user.mention} a rejoint le serveur {server.name} !")
+  imageEnabled        Boolean  @default(true)
+  dmEnabled           Boolean  @default(false)
+  dmMessage           String   @default("Bienvenue sur {server.name}, {user.name} !")
+  reactionRoleEnabled Boolean  @default(false)
+  reactionRoleId      String?
+  autoRoleEnabled     Boolean  @default(false)
+  autoRoleId          String?
+  updatedAt           DateTime @updatedAt
+}
+
+model Member {
+  id        Int      @id @default(autoincrement())
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId   String
+  userId    String
+  xp        Int      @default(0)
+  level     Int      @default(0)
+  messages  Int      @default(0)
+  lastXpAt  DateTime?
+
+  @@unique([guildId, userId])
+  @@index([guildId, xp])
+}
+
+model LevelReward {
+  id      Int    @id @default(autoincrement())
+  guild   Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId String
+  level   Int
+  roleId  String
+
+  @@unique([guildId, level])
+}
+
+model ModerationCase {
+  id          Int       @id @default(autoincrement())
+  guild       Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId     String
+  userId      String
+  moderatorId String
+  type        String
+  reason      String?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([guildId, userId])
+}
+
+model CustomCommand {
+  id        Int      @id @default(autoincrement())
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId   String
+  name      String
+  response  String
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, name])
+}
+
+model Giveaway {
+  id           Int             @id @default(autoincrement())
+  guild        Guild           @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId      String
+  channelId    String
+  messageId    String?
+  prize        String
+  winnerCount  Int             @default(1)
+  hostId       String
+  endsAt       DateTime
+  ended        Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  entries      GiveawayEntry[]
+}
+
+model GiveawayEntry {
+  id         Int      @id @default(autoincrement())
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  giveawayId Int
+  userId     String
+  createdAt  DateTime @default(now())
+
+  @@unique([giveawayId, userId])
+}
+
+model ReactionRoleMessage {
+  id        Int                   @id @default(autoincrement())
+  guild     Guild                 @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId   String
+  channelId String
+  messageId String?
+  title     String                @default("Roles")
+  dirty     Boolean               @default(true)
+  buttons   ReactionRoleButton[]
+  createdAt DateTime              @default(now())
+}
+
+model ReactionRoleButton {
+  id        Int                  @id @default(autoincrement())
+  message   ReactionRoleMessage  @relation(fields: [messageId_fk], references: [id], onDelete: Cascade)
+  messageId_fk Int
+  roleId    String
+  emoji     String?
+  label     String
+
+  @@unique([messageId_fk, roleId])
+}
+
+model GameStat {
+  id      Int    @id @default(autoincrement())
+  guild   Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId String
+  userId  String
+  game    String
+  wins    Int    @default(0)
+  losses  Int    @default(0)
+  draws   Int    @default(0)
+  plays   Int    @default(0)
+
+  @@unique([guildId, userId, game])
+}
+
+model SlashCommandToggle {
+  id      Int     @id @default(autoincrement())
+  guild   Guild   @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId String
+  name    String
+  enabled Boolean @default(true)
+
+  @@unique([guildId, name])
+}

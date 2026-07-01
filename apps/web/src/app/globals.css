@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: linear-gradient(160deg, #f7f5ff 0%, #e1f5ee 45%, #fbeaf0 100%);
+  min-height: 100vh;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.bubble-btn {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.bubble-btn:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+.bubble-btn:active {
+  transform: translateY(0) scale(0.98);
+}

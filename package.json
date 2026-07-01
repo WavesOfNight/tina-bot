@@ -1,0 +1,20 @@
+{
+  "name": "tina-bot-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "db:generate": "npm run generate --workspace=@tina/database",
+    "db:push": "npm run push --workspace=@tina/database",
+    "db:studio": "npm run studio --workspace=@tina/database",
+    "db:build": "npm run generate --workspace=@tina/database && npm run build --workspace=@tina/database",
+    "bot:dev": "npm run dev --workspace=@tina/bot",
+    "bot:deploy": "npm run deploy --workspace=@tina/bot",
+    "bot:start": "npm run start --workspace=@tina/bot",
+    "web:dev": "npm run dev --workspace=@tina/web",
+    "web:build": "npm run build --workspace=@tina/web",
+    "web:start": "npm run start --workspace=@tina/web"
+  }
+}

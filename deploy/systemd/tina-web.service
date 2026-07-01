@@ -1,0 +1,15 @@
+[Unit]
+Description=Tina BOT - Panel web (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=tina
+WorkingDirectory=/opt/tina-bot/apps/web
+EnvironmentFile=/opt/tina-bot/apps/web/.env.local
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
