@@ -36,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             Discord({
               clientId: botConfig.clientId,
               clientSecret: botConfig.clientSecret,
-              authorization: { params: { scope: "identify guilds" } },
+              authorization: "https://discord.com/api/oauth2/authorize?scope=identify+guilds",
             }),
           ]
         : []),
