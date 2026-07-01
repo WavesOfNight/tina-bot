@@ -1,17 +1,15 @@
-import { ActivityType, Events, type Client } from "discord.js";
+import { Events, type Client } from "discord.js";
 import { checkExpiredGiveaways, postPendingGiveaways } from "../lib/giveaway.js";
 import { syncReactionRoleMessages } from "../lib/reactionrole.js";
 import { deployCommands } from "../lib/deploy.js";
+import { startActivityRotation } from "../lib/activity-rotation.js";
 
 export const name = Events.ClientReady;
 export const once = true;
 
 export async function execute(client: Client<true>) {
   console.log(`Tina [BOT] connectee en tant que ${client.user.tag}`);
-  client.user.setPresence({
-    activities: [{ name: "sur le panel web de Tina", type: ActivityType.Watching }],
-    status: "online",
-  });
+  await startActivityRotation(client);
 
   if (client.token) {
     const count = await deployCommands(client.application.id, client.token).catch((error) => {

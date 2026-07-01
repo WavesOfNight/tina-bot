@@ -9,7 +9,8 @@ const command: Command = {
       .setTitle("Commandes de Tina [BOT]")
       .addFields(
         { name: "Fun", value: "/hello, /hug" },
-        { name: "Jeux", value: "/morpion, /loto" },
+        { name: "Jeux (1v1)", value: "/morpion, /puissance4, /chifumi, /loto" },
+        { name: "Jeux (party)", value: "/trivia, /bombe, /histoire, /combattre" },
         { name: "Niveaux", value: "/rank, /leaderboard" },
         { name: "Moderation", value: "/ban, /kick, /mute, /warn, /warnings, /clear" },
         { name: "Giveaways", value: "/giveaway start|end|reroll|list" },

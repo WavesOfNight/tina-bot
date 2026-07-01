@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { getBotConfig } from "@tina/database";
 import "./config.js";
 import { events } from "./events/index.js";
+import { stopActivityRotation } from "./lib/activity-rotation.js";
 
 const POLL_INTERVAL_MS = 5_000;
 const RETRY_COOLDOWN_MS = 30_000;
@@ -45,6 +46,7 @@ async function supervise() {
   if (!botConfig) {
     if (currentClient) {
       console.log("Configuration du bot supprimee, deconnexion.");
+      stopActivityRotation();
       await currentClient.destroy();
       currentClient = null;
       currentToken = null;
@@ -61,6 +63,7 @@ async function supervise() {
 
   if (currentClient) {
     console.log("Token mis a jour, reconnexion de Tina [BOT]...");
+    stopActivityRotation();
     await currentClient.destroy();
     currentClient = null;
     currentToken = null;

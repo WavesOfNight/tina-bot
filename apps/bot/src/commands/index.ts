@@ -3,6 +3,12 @@ import hello from "./fun/hello.js";
 import hug from "./fun/hug.js";
 import morpion from "./games/morpion.js";
 import loto from "./games/loto.js";
+import puissance4 from "./games/puissance4.js";
+import chifumi from "./games/chifumi.js";
+import trivia from "./games/trivia.js";
+import bombe from "./games/bombe.js";
+import histoire from "./games/histoire.js";
+import rumble from "./games/rumble.js";
 import ban from "./moderation/ban.js";
 import kick from "./moderation/kick.js";
 import mute from "./moderation/mute.js";
@@ -21,6 +27,12 @@ export const commands: Command[] = [
   hug,
   morpion,
   loto,
+  puissance4,
+  chifumi,
+  trivia,
+  bombe,
+  histoire,
+  rumble,
   ban,
   kick,
   mute,

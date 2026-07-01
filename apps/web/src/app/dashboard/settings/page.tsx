@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getBotConfig, setBotConfig } from "@tina/database";
+import { getBotConfig, prisma, setBotConfig } from "@tina/database";
 import { auth } from "@/auth";
 import { checkBotConnection } from "@/lib/discord";
 
@@ -21,11 +21,48 @@ async function saveBotConfig(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+async function addActivity(formData: FormData) {
+  "use server";
+  const type = (formData.get("type") as string) || "WATCHING";
+  const text = (formData.get("text") as string)?.trim();
+  const durationSeconds = Number(formData.get("durationSeconds") || 30);
+  if (!text) return;
+
+  const maxOrder = await prisma.botActivity.aggregate({ _max: { order: true } });
+  await prisma.botActivity.create({
+    data: { type, text, durationSeconds, order: (maxOrder._max.order ?? -1) + 1 },
+  });
+  revalidatePath("/dashboard/settings");
+}
+
+async function toggleActivity(id: number, enabled: boolean) {
+  "use server";
+  await prisma.botActivity.update({ where: { id }, data: { enabled } });
+  revalidatePath("/dashboard/settings");
+}
+
+async function deleteActivity(id: number) {
+  "use server";
+  await prisma.botActivity.delete({ where: { id } });
+  revalidatePath("/dashboard/settings");
+}
+
+const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  PLAYING: "Joue a",
+  WATCHING: "Regarde/Surveille",
+  LISTENING: "Ecoute",
+  COMPETING: "Participe a",
+};
+
 export default async function SettingsPage() {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const [config, connection] = await Promise.all([getBotConfig(), checkBotConnection()]);
+  const [config, connection, activities] = await Promise.all([
+    getBotConfig(),
+    checkBotConnection(),
+    prisma.botActivity.findMany({ orderBy: { order: "asc" } }),
+  ]);
 
   const inviteUrl = config
     ? `https://discord.com/api/oauth2/authorize?client_id=${config.clientId}&scope=bot%20applications.commands&permissions=1099511627775`
@@ -92,6 +129,73 @@ export default async function SettingsPage() {
           </a>
         </div>
       )}
+
+      <h2 className="font-display mb-3 mt-8 flex items-center gap-2 text-lg font-semibold text-lavender-900">
+        <span aria-hidden="true">🎬</span> Activite du bot ({activities.length})
+      </h2>
+      <p className="mb-3 text-xs text-lavender-500">
+        Le bot fait defiler ces statuts les uns apres les autres, chacun pendant la duree indiquee. Variables : {"{randomMember}"}
+        {" "}(membre au hasard), {"{memberCount}"} (nombre de membres), {"{serverCount}"} (nombre de serveurs).
+      </p>
+
+      <form action={addActivity} className="glass-panel mb-4 flex flex-wrap items-end gap-3 rounded-aero p-5 shadow-glass">
+        <div>
+          <label className="mb-1 block text-xs text-lavender-600">Type</label>
+          <select name="type" className="rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm">
+            <option value="WATCHING">Regarde/Surveille</option>
+            <option value="PLAYING">Joue a</option>
+            <option value="LISTENING">Ecoute</option>
+            <option value="COMPETING">Participe a</option>
+          </select>
+        </div>
+        <div className="flex-1">
+          <label className="mb-1 block text-xs text-lavender-600">Texte</label>
+          <input
+            name="text"
+            required
+            placeholder="{randomMember} | /help pour voir les commandes"
+            className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-lavender-600">Duree (secondes)</label>
+          <input type="number" name="durationSeconds" defaultValue={30} min={5} className="w-24 rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+        </div>
+        <button type="submit" className="bubble-btn rounded-full bg-lavender-400 px-5 py-2 text-sm font-medium text-white shadow-glass">
+          Ajouter
+        </button>
+      </form>
+
+      <div className="glass-panel rounded-aero p-2 shadow-glass">
+        {activities.length === 0 && <p className="p-4 text-sm text-lavender-600">Aucune activite configuree, le bot affiche le statut par defaut.</p>}
+        {activities.map((activity) => (
+          <div key={activity.id} className="flex items-center justify-between gap-3 border-b border-lavender-100 px-4 py-3 last:border-none">
+            <div>
+              <p className="font-medium text-lavender-900">
+                {ACTIVITY_TYPE_LABELS[activity.type] ?? activity.type} {activity.text}
+              </p>
+              <p className="text-xs text-lavender-600">{activity.durationSeconds}s</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <form action={toggleActivity.bind(null, activity.id, !activity.enabled)}>
+                <button
+                  type="submit"
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    activity.enabled ? "bg-aqua-200 text-aqua-800" : "bg-lavender-100 text-lavender-500"
+                  }`}
+                >
+                  {activity.enabled ? "Active" : "Desactive"}
+                </button>
+              </form>
+              <form action={deleteActivity.bind(null, activity.id)}>
+                <button type="submit" className="rounded-full bg-coral-100 px-3 py-1 text-xs font-medium text-coral-600">
+                  Supprimer
+                </button>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
     </main>
   );
 }

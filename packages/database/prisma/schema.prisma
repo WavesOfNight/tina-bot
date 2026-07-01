@@ -38,6 +38,26 @@ model Guild {
   reactionRoleMsgs   ReactionRoleMessage[]
   gameStats          GameStat[]
   slashCommandToggle SlashCommandToggle[]
+  collabStory        CollabStory?
+}
+
+model CollabStory {
+  id         Int      @id @default(autoincrement())
+  guild      Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId    String   @unique
+  content    String   @default("")
+  lastUserId String?
+  updatedAt  DateTime @updatedAt
+}
+
+model BotActivity {
+  id              Int      @id @default(autoincrement())
+  type            String   @default("WATCHING")
+  text            String
+  durationSeconds Int      @default(30)
+  order           Int      @default(0)
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
 }
 
 model WelcomeConfig {
