@@ -4,6 +4,7 @@ import { verifyAdminCredentials } from "@tina/database";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   session: { strategy: "jwt" },
   providers: [
     Credentials({

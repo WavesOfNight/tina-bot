@@ -51,7 +51,7 @@ DB_PATH="$APP_DIR/packages/database/prisma/dev.db"
 if [ ! -f "$APP_DIR/packages/database/.env" ]; then
   echo "==> Writing packages/database/.env"
   cat > "$APP_DIR/packages/database/.env" <<EOF
-DATABASE_URL="file:$DB_PATH"
+DATABASE_URL=file:$DB_PATH
 EOF
 fi
 
@@ -59,7 +59,7 @@ if [ ! -f "$APP_DIR/apps/bot/.env" ]; then
   echo "==> Writing apps/bot/.env (generating a fresh TOKEN_ENCRYPTION_KEY)"
   TOKEN_KEY=$(openssl rand -hex 32)
   cat > "$APP_DIR/apps/bot/.env" <<EOF
-DATABASE_URL="file:$DB_PATH"
+DATABASE_URL=file:$DB_PATH
 TOKEN_ENCRYPTION_KEY=$TOKEN_KEY
 DISCORD_DEV_GUILD_ID=
 EOF
@@ -71,7 +71,7 @@ if [ ! -f "$APP_DIR/apps/web/.env.local" ]; then
   echo "==> Writing apps/web/.env.local (reusing the same TOKEN_ENCRYPTION_KEY)"
   AUTH_SECRET=$(openssl rand -base64 32)
   cat > "$APP_DIR/apps/web/.env.local" <<EOF
-DATABASE_URL="file:$DB_PATH"
+DATABASE_URL=file:$DB_PATH
 TOKEN_ENCRYPTION_KEY=$TOKEN_KEY
 NEXTAUTH_URL=https://$DOMAIN
 NEXTAUTH_SECRET=$AUTH_SECRET

@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createAdminUser, hasAdminUser } from "@tina/database";
 import { signIn } from "@/auth";
 
+export const dynamic = "force-dynamic";
+
 async function createFirstAdmin(formData: FormData) {
   "use server";
   const username = (formData.get("username") as string)?.trim();

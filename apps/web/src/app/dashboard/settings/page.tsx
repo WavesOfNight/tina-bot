@@ -4,6 +4,8 @@ import { getBotConfig, setBotConfig } from "@tina/database";
 import { auth } from "@/auth";
 import { checkBotConnection } from "@/lib/discord";
 
+export const dynamic = "force-dynamic";
+
 async function saveBotConfig(formData: FormData) {
   "use server";
   const clientId = (formData.get("clientId") as string)?.trim();

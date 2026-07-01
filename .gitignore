@@ -7,3 +7,4 @@ dist/
 packages/database/prisma/dev.db
 packages/database/prisma/dev.db-journal
 .DS_Store
+*.tsbuildinfo

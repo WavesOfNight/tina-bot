@@ -1,6 +1,8 @@
 import { getBotConfig } from "@tina/database";
 import { getBotGuilds } from "@/lib/discord";
 
+export const dynamic = "force-dynamic";
+
 export default async function GuildPickerPage() {
   const botConfig = await getBotConfig();
   const guilds = botConfig ? await getBotGuilds() : [];
