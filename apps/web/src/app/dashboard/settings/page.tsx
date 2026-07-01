@@ -41,14 +41,14 @@ export default async function SettingsPage() {
       </div>
 
       <div className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
-        <p className="mb-1 text-sm font-medium text-lavender-800">Statut de connexion</p>
+        <p className="mb-1 text-sm font-medium text-lavender-800">Statut du token</p>
         {connection.connected ? (
           <p className="flex items-center gap-2 text-sm text-aqua-600">
-            <span className="h-2 w-2 rounded-full bg-aqua-400" /> Connectee en tant que {connection.tag}
+            <span className="h-2 w-2 rounded-full bg-aqua-400" /> Token valide ({connection.tag}) - verifie sur Discord que le bot apparait bien en ligne
           </p>
         ) : (
           <p className="flex items-center gap-2 text-sm text-coral-600">
-            <span className="h-2 w-2 rounded-full bg-coral-400" /> Deconnectee
+            <span className="h-2 w-2 rounded-full bg-coral-400" /> Token invalide ou absent
           </p>
         )}
       </div>

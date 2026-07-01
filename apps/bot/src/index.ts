@@ -4,9 +4,12 @@ import "./config.js";
 import { events } from "./events/index.js";
 
 const POLL_INTERVAL_MS = 5_000;
+const RETRY_COOLDOWN_MS = 30_000;
 
 let currentClient: Client | null = null;
 let currentToken: string | null = null;
+let lastAttemptedToken: string | null = null;
+let lastAttemptAt = 0;
 
 function createClient(): Client {
   const client = new Client({
@@ -53,20 +56,26 @@ async function supervise() {
 
   if (botConfig.token === currentToken) return;
 
+  const now = Date.now();
+  if (botConfig.token === lastAttemptedToken && now - lastAttemptAt < RETRY_COOLDOWN_MS) return;
+
   if (currentClient) {
     console.log("Token mis a jour, reconnexion de Tina [BOT]...");
     await currentClient.destroy();
     currentClient = null;
+    currentToken = null;
   }
 
-  currentToken = botConfig.token;
+  lastAttemptedToken = botConfig.token;
+  lastAttemptAt = now;
   const client = createClient();
 
   try {
     await client.login(botConfig.token);
     currentClient = client;
+    currentToken = botConfig.token;
   } catch (error) {
-    console.error("Connexion impossible avec le token fourni. Verifie-le dans le panel web > Parametres.", error);
+    console.error("Connexion impossible avec le token fourni. Nouvelle tentative dans 30s. Verifie-le dans le panel web > Parametres si le probleme persiste.", error);
   }
 }
 
