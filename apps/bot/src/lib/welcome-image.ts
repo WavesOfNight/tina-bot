@@ -1,8 +1,8 @@
 import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas";
 import type { GuildMember } from "discord.js";
 
-const WIDTH = 900;
-const HEIGHT = 300;
+const WIDTH = 720;
+const HEIGHT = 340;
 
 function drawBubble(ctx: any, x: number, y: number, r: number, alpha: number) {
   ctx.save();
@@ -22,6 +22,24 @@ function roundRect(ctx: any, x: number, y: number, w: number, h: number, r: numb
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+function wrapText(ctx: any, text: string, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+    if (ctx.measureText(candidate).width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = candidate;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines;
 }
 
 function drawImageCover(ctx: any, image: any, x: number, y: number, w: number, h: number) {
@@ -122,17 +140,25 @@ export async function generateWelcomeImage(
 
   ctx.textAlign = "center";
   ctx.fillStyle = customBackgroundLoaded ? "#ffffff" : "#26215C";
-  let fontSize = 36;
+  const maxTextWidth = WIDTH - 80;
+  let fontSize = 32;
   ctx.font = `bold ${fontSize}px sans-serif`;
-  while (ctx.measureText(welcomeText).width > WIDTH - 80 && fontSize > 18) {
+  let lines = wrapText(ctx, welcomeText, maxTextWidth);
+  while (lines.length > 3 && fontSize > 16) {
     fontSize -= 2;
     ctx.font = `bold ${fontSize}px sans-serif`;
+    lines = wrapText(ctx, welcomeText, maxTextWidth);
   }
-  ctx.fillText(welcomeText, WIDTH / 2, avatarY + avatarSize + 55);
 
-  ctx.font = "22px sans-serif";
+  const lineHeight = fontSize + 8;
+  const textStartY = avatarY + avatarSize + 40;
+  lines.forEach((line, index) => {
+    ctx.fillText(line, WIDTH / 2, textStartY + index * lineHeight);
+  });
+
+  ctx.font = "20px sans-serif";
   ctx.fillStyle = customBackgroundLoaded ? "rgba(255,255,255,0.85)" : "#534AB7";
-  ctx.fillText(`Membre n${member.guild.memberCount}`, WIDTH / 2, avatarY + avatarSize + 88);
+  ctx.fillText(`Membre n${member.guild.memberCount}`, WIDTH / 2, textStartY + lines.length * lineHeight + 12);
 
   return canvas.toBuffer("image/png");
 }
