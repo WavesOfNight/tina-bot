@@ -1,6 +1,16 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels, getGuildRoles } from "@/lib/discord";
+
+const UPLOADS_DIR = join(process.cwd(), "public", "uploads");
+const ALLOWED_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
 
 async function saveWelcomeConfig(guildId: string, formData: FormData) {
   "use server";
@@ -16,11 +26,28 @@ async function saveWelcomeConfig(guildId: string, formData: FormData) {
   const reactionRoleId = (formData.get("reactionRoleId") as string) || null;
   const autoRoleEnabled = formData.get("autoRoleEnabled") === "on";
   const autoRoleId = (formData.get("autoRoleId") as string) || null;
+  const removeBackground = formData.get("removeBackground") === "on";
+
+  const existing = await prisma.welcomeConfig.findUnique({ where: { guildId } });
+  let imageBackgroundUrl = removeBackground ? null : (existing?.imageBackgroundUrl ?? null);
+
+  const file = formData.get("backgroundImage") as File | null;
+  if (file && file.size > 0) {
+    const ext = ALLOWED_TYPES[file.type];
+    if (ext) {
+      await mkdir(UPLOADS_DIR, { recursive: true });
+      const filename = `welcome-${guildId}.${ext}`;
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await writeFile(join(UPLOADS_DIR, filename), buffer);
+      const baseUrl = process.env.NEXTAUTH_URL ?? "";
+      imageBackgroundUrl = `${baseUrl}/uploads/${filename}?v=${Date.now()}`;
+    }
+  }
 
   await prisma.welcomeConfig.upsert({
     where: { guildId },
-    create: { guildId, channelId, message, imageText, dmMessage, imageEnabled, dmEnabled, reactionRoleEnabled, reactionRoleId, autoRoleEnabled, autoRoleId },
-    update: { channelId, message, imageText, dmMessage, imageEnabled, dmEnabled, reactionRoleEnabled, reactionRoleId, autoRoleEnabled, autoRoleId },
+    create: { guildId, channelId, message, imageText, imageBackgroundUrl, dmMessage, imageEnabled, dmEnabled, reactionRoleEnabled, reactionRoleId, autoRoleEnabled, autoRoleId },
+    update: { channelId, message, imageText, imageBackgroundUrl, dmMessage, imageEnabled, dmEnabled, reactionRoleEnabled, reactionRoleId, autoRoleEnabled, autoRoleId },
   });
 
   revalidatePath(`/dashboard/${guildId}/bienvenue`);
@@ -109,7 +136,25 @@ export default async function BienvenuePage({ params }: { params: { guildId: str
             defaultValue={config?.imageText ?? "Bienvenue {user} !"}
             className="mb-1 w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
           />
-          <p className="text-[11px] text-lavender-500">Variables : {"{user}"} (pseudo), {"{server}"} (nom du serveur)</p>
+          <p className="mb-4 text-[11px] text-lavender-500">Variables : {"{user}"} (pseudo), {"{server}"} (nom du serveur)</p>
+
+          <label className="mb-1 block text-xs text-lavender-600">Fond personnalise de l&apos;image (mode Image)</label>
+          {config?.imageBackgroundUrl && (
+            <div className="mb-2 flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={config.imageBackgroundUrl} alt="Fond actuel" className="h-12 w-24 rounded-lg object-cover" />
+              <label className="flex items-center gap-1.5 text-xs text-coral-600">
+                <input type="checkbox" name="removeBackground" /> Retirer le fond actuel
+              </label>
+            </div>
+          )}
+          <input
+            type="file"
+            name="backgroundImage"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-lavender-100 file:px-3 file:py-1 file:text-xs file:text-lavender-800"
+          />
+          <p className="text-[11px] text-lavender-500">PNG, JPG, WEBP ou GIF. Remplace le fond pastel par defaut.</p>
         </div>
 
         <div className="glass-panel rounded-aero p-5 shadow-glass">

@@ -24,7 +24,7 @@ export async function execute(member: GuildMember) {
       if (config.imageEnabled) {
         try {
           const welcomeText = applyPlaceholders(config.imageText, member, member.guild);
-          const buffer = await generateWelcomeImage(member, welcomeText);
+          const buffer = await generateWelcomeImage(member, welcomeText, config.imageBackgroundUrl);
           files.push(new AttachmentBuilder(buffer, { name: "bienvenue.png" }));
         } catch {
           // Image generation failed (e.g. avatar unreachable); fall back to the text welcome.

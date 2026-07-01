@@ -24,25 +24,68 @@ function roundRect(ctx: any, x: number, y: number, w: number, h: number, r: numb
   ctx.closePath();
 }
 
-export async function generateWelcomeImage(member: GuildMember, welcomeText: string): Promise<Buffer> {
+function drawImageCover(ctx: any, image: any, x: number, y: number, w: number, h: number) {
+  const imageRatio = image.width / image.height;
+  const boxRatio = w / h;
+  let drawWidth = w;
+  let drawHeight = h;
+
+  if (imageRatio > boxRatio) {
+    drawHeight = h;
+    drawWidth = h * imageRatio;
+  } else {
+    drawWidth = w;
+    drawHeight = w / imageRatio;
+  }
+
+  const drawX = x + (w - drawWidth) / 2;
+  const drawY = y + (h - drawHeight) / 2;
+  ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+}
+
+export async function generateWelcomeImage(
+  member: GuildMember,
+  welcomeText: string,
+  backgroundUrl?: string | null,
+): Promise<Buffer> {
   const canvas = createCanvas(WIDTH, HEIGHT);
   const ctx = canvas.getContext("2d");
 
-  const gradient = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
-  gradient.addColorStop(0, "#EEEDFE");
-  gradient.addColorStop(0.5, "#E1F5EE");
-  gradient.addColorStop(1, "#FBEAF0");
-  ctx.fillStyle = gradient;
   roundRect(ctx, 0, 0, WIDTH, HEIGHT, 28);
-  ctx.fill();
+  ctx.save();
+  ctx.clip();
 
-  drawBubble(ctx, 80, 60, 26, 0.5);
-  drawBubble(ctx, 120, 220, 16, 0.4);
-  drawBubble(ctx, 830, 70, 20, 0.4);
-  drawBubble(ctx, 800, 240, 30, 0.5);
-  drawBubble(ctx, 450, 40, 10, 0.35);
+  let customBackgroundLoaded = false;
+  if (backgroundUrl) {
+    try {
+      const backgroundImage = await loadImage(backgroundUrl);
+      drawImageCover(ctx, backgroundImage, 0, 0, WIDTH, HEIGHT);
+      ctx.fillStyle = "rgba(20, 16, 40, 0.45)";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      customBackgroundLoaded = true;
+    } catch {
+      // Custom background failed to load, fall back to the default gradient below.
+    }
+  }
 
-  ctx.strokeStyle = "#7F77DD";
+  if (!customBackgroundLoaded) {
+    const gradient = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+    gradient.addColorStop(0, "#EEEDFE");
+    gradient.addColorStop(0.5, "#E1F5EE");
+    gradient.addColorStop(1, "#FBEAF0");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    drawBubble(ctx, 80, 60, 26, 0.5);
+    drawBubble(ctx, 120, 220, 16, 0.4);
+    drawBubble(ctx, 830, 70, 20, 0.4);
+    drawBubble(ctx, 800, 240, 30, 0.5);
+    drawBubble(ctx, 450, 40, 10, 0.35);
+  }
+
+  ctx.restore();
+
+  ctx.strokeStyle = customBackgroundLoaded ? "rgba(255,255,255,0.8)" : "#7F77DD";
   ctx.lineWidth = 6;
   roundRect(ctx, 6, 6, WIDTH - 12, HEIGHT - 12, 24);
   ctx.stroke();
@@ -76,7 +119,7 @@ export async function generateWelcomeImage(member: GuildMember, welcomeText: str
   }
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#26215C";
+  ctx.fillStyle = customBackgroundLoaded ? "#ffffff" : "#26215C";
   let fontSize = 36;
   ctx.font = `bold ${fontSize}px sans-serif`;
   while (ctx.measureText(welcomeText).width > WIDTH - 80 && fontSize > 18) {
@@ -86,7 +129,7 @@ export async function generateWelcomeImage(member: GuildMember, welcomeText: str
   ctx.fillText(welcomeText, WIDTH / 2, avatarY + avatarSize + 55);
 
   ctx.font = "22px sans-serif";
-  ctx.fillStyle = "#534AB7";
+  ctx.fillStyle = customBackgroundLoaded ? "rgba(255,255,255,0.85)" : "#534AB7";
   ctx.fillText(`Membre n${member.guild.memberCount}`, WIDTH / 2, avatarY + avatarSize + 88);
 
   return canvas.toBuffer("image/png");

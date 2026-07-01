@@ -8,3 +8,4 @@ packages/database/prisma/dev.db
 packages/database/prisma/dev.db-journal
 .DS_Store
 *.tsbuildinfo
+apps/web/public/uploads/
