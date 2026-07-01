@@ -14,13 +14,19 @@ const DEFAULT_DURATION_MS = 30_000;
 let currentIndex = 0;
 let timer: NodeJS.Timeout | null = null;
 
-function resolveActivityText(text: string, client: Client<true>): string {
+async function resolveActivityText(text: string, client: Client<true>): Promise<string> {
   let resolved = text;
 
   if (resolved.includes("{randomMember}")) {
     const guilds = [...client.guilds.cache.values()];
     const guild = guilds[Math.floor(Math.random() * guilds.length)];
-    const members = guild ? [...guild.members.cache.filter((m) => !m.user.bot).values()] : [];
+    let members = guild ? [...guild.members.cache.filter((m) => !m.user.bot).values()] : [];
+
+    if (guild && members.length === 0) {
+      const fetched = await guild.members.fetch().catch(() => null);
+      if (fetched) members = [...fetched.filter((m) => !m.user.bot).values()];
+    }
+
     const member = members[Math.floor(Math.random() * members.length)];
     resolved = resolved.replaceAll("{randomMember}", member ? member.user.username : "quelqu'un");
   }
@@ -59,7 +65,7 @@ export async function startActivityRotation(client: Client<true>) {
 
     if (currentIndex >= activities.length) currentIndex = 0;
     const activity = activities[currentIndex];
-    const text = resolveActivityText(activity.text, client);
+    const text = await resolveActivityText(activity.text, client);
     const type = ACTIVITY_TYPE_MAP[activity.type] ?? ActivityType.Watching;
 
     client.user.setPresence({ activities: [{ name: text, type }], status: "online" });

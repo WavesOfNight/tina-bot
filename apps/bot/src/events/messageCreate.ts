@@ -3,6 +3,8 @@ import { prisma } from "@tina/database";
 import { grantMessageXp } from "../lib/xp.js";
 import { findAutoResponseMatch } from "../lib/auto-response.js";
 import { bombeRounds } from "../lib/bombe-store.js";
+import { findAutoModMatch } from "../lib/automod.js";
+import { logCase } from "../lib/moderation.js";
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -11,6 +13,26 @@ export async function execute(message: Message) {
   if (message.author.bot || !message.guild) return;
 
   const channel = message.channel as TextChannel;
+  const guildData = await prisma.guild.findUnique({ where: { id: message.guild.id } });
+
+  if (guildData?.autoModLevel && guildData.autoModLevel !== "OFF") {
+    const matchedWord = findAutoModMatch(guildData.autoModLevel, message.content);
+    if (matchedWord && message.deletable) {
+      await message.delete().catch(() => null);
+      await logCase({
+        guild: message.guild,
+        userId: message.author.id,
+        moderatorId: message.client.user.id,
+        type: "AUTOMOD",
+        reason: `Message supprime automatiquement (mot filtre : "${matchedWord}")`,
+      });
+      const notice = await channel
+        .send(`⚠️ ${message.author}, ton message a ete supprime par la moderation automatique.`)
+        .catch(() => null);
+      setTimeout(() => notice?.delete().catch(() => null), 6_000);
+      return;
+    }
+  }
 
   const bombeRound = bombeRounds.get(message.channelId);
   if (bombeRound?.active) {
@@ -45,7 +67,6 @@ export async function execute(message: Message) {
     }
   }
 
-  const guildData = await prisma.guild.findUnique({ where: { id: message.guild.id } });
   const prefix = guildData?.prefix ?? "!";
 
   if (message.content.startsWith(prefix)) {

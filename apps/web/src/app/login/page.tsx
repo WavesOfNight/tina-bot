@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { hasAdminUser } from "@tina/database";
+import { getBotConfig, hasAdminUser } from "@tina/database";
 import { signIn } from "@/auth";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +16,18 @@ async function doLogin(formData: FormData) {
   }
 }
 
+async function doDiscordLogin() {
+  "use server";
+  await signIn("discord", { redirectTo: "/dashboard" });
+}
+
 export default async function LoginPage({ searchParams }: { searchParams: { error?: string } }) {
   if (!(await hasAdminUser())) {
     redirect("/setup");
   }
+
+  const botConfig = await getBotConfig();
+  const discordLoginAvailable = Boolean(botConfig?.clientSecret);
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
@@ -59,6 +67,20 @@ export default async function LoginPage({ searchParams }: { searchParams: { erro
             Se connecter
           </button>
         </form>
+
+        {discordLoginAvailable && (
+          <>
+            <div className="my-4 flex items-center gap-3 text-xs text-lavender-400">
+              <span className="h-px flex-1 bg-lavender-200" /> ou <span className="h-px flex-1 bg-lavender-200" />
+            </div>
+            <p className="mb-2 text-xs text-lavender-500">Admin d&apos;un serveur ou est Tina [BOT] ?</p>
+            <form action={doDiscordLogin}>
+              <button type="submit" className="bubble-btn w-full rounded-full bg-[#5865F2] px-6 py-3 text-sm font-medium text-white shadow-glass">
+                Se connecter avec Discord
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </main>
   );

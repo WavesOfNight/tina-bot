@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: string;
+  section: string;
+  global?: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { href: "", label: "Tableau de bord", icon: "🏠", section: "top" },
   { href: "bienvenue", label: "Bienvenue", icon: "🎁", section: "modules" },
   { href: "commandes", label: "Commandes Perso", icon: "⌨️", section: "modules" },
@@ -15,9 +23,12 @@ const NAV_ITEMS = [
   { href: "reaction-buttons", label: "Reaction Buttons", icon: "🖱️", section: "modules" },
 ];
 
-export function Sidebar({ guildId }: { guildId: string }) {
+const SETTINGS_ITEM: NavItem = { href: "/dashboard/settings", label: "Parametres", icon: "⚙️", section: "global", global: true };
+
+export function Sidebar({ guildId, showSettings = true }: { guildId: string; showSettings?: boolean }) {
   const pathname = usePathname();
   const base = `/dashboard/${guildId}`;
+  const items = showSettings ? [...NAV_ITEMS, SETTINGS_ITEM] : NAV_ITEMS;
 
   return (
     <aside className="glass-panel flex w-56 flex-shrink-0 flex-col rounded-aero p-4 shadow-glass">
@@ -27,8 +38,8 @@ export function Sidebar({ guildId }: { guildId: string }) {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {NAV_ITEMS.map((item) => {
-          const href = item.href ? `${base}/${item.href}` : base;
+        {items.map((item) => {
+          const href = item.global ? item.href : item.href ? `${base}/${item.href}` : base;
           const active = pathname === href;
           return (
             <Link

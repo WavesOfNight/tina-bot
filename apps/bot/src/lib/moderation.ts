@@ -1,7 +1,7 @@
 import { EmbedBuilder, type Guild, type TextChannel } from "discord.js";
 import { prisma } from "@tina/database";
 
-export type ModerationType = "WARN" | "MUTE" | "UNMUTE" | "KICK" | "BAN" | "UNBAN";
+export type ModerationType = "WARN" | "MUTE" | "UNMUTE" | "KICK" | "BAN" | "UNBAN" | "AUTOMOD";
 
 export async function logCase(params: {
   guild: Guild;

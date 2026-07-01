@@ -15,10 +15,11 @@ model AdminUser {
 }
 
 model BotConfig {
-  id             Int      @id @default(1)
-  clientId       String
-  tokenEncrypted String
-  updatedAt      DateTime @updatedAt
+  id                      Int      @id @default(1)
+  clientId                String
+  tokenEncrypted          String
+  clientSecretEncrypted   String?
+  updatedAt               DateTime @updatedAt
 }
 
 model Guild {
@@ -26,6 +27,7 @@ model Guild {
   name           String?
   prefix         String   @default("!")
   modLogChannelId String?
+  autoModLevel   String   @default("OFF")
   createdAt      DateTime @default(now())
 
   welcomeConfig      WelcomeConfig?

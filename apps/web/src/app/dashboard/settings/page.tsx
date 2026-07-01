@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getBotConfig, prisma, setBotConfig } from "@tina/database";
-import { auth } from "@/auth";
+import { auth, type SessionRole } from "@/auth";
 import { checkBotConnection } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
@@ -10,15 +10,18 @@ async function saveBotConfig(formData: FormData) {
   "use server";
   const clientId = (formData.get("clientId") as string)?.trim();
   const token = (formData.get("token") as string)?.trim();
+  const clientSecret = (formData.get("clientSecret") as string)?.trim();
   if (!clientId) return;
 
   const existing = await getBotConfig();
   const tokenToUse = token || existing?.token;
   if (!tokenToUse) return;
+  const clientSecretToUse = clientSecret || existing?.clientSecret || null;
 
-  await setBotConfig(clientId, tokenToUse);
+  await setBotConfig(clientId, tokenToUse, clientSecretToUse);
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard");
+  revalidatePath("/login");
 }
 
 async function addActivity(formData: FormData) {
@@ -57,6 +60,8 @@ const ACTIVITY_TYPE_LABELS: Record<string, string> = {
 export default async function SettingsPage() {
   const session = await auth();
   if (!session) redirect("/login");
+  const role = (session as typeof session & { role?: SessionRole }).role ?? "owner";
+  if (role !== "owner") redirect("/dashboard");
 
   const [config, connection, activities] = await Promise.all([
     getBotConfig(),
@@ -114,6 +119,20 @@ export default async function SettingsPage() {
             discord.com/developers/applications
           </a>{" "}
           (Bot &gt; Reset Token, et General Information &gt; Application ID). Le token est chiffre avant d&apos;etre stocke.
+        </p>
+
+        <label className="mb-1 block text-xs text-lavender-600">Client Secret (optionnel)</label>
+        <input
+          name="clientSecret"
+          type="password"
+          placeholder={config?.clientSecret ? "Laisse vide pour garder le secret actuel" : "Colle le Client Secret depuis OAuth2"}
+          className="mb-1 w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+        />
+        <p className="mb-4 text-xs text-lavender-500">
+          Permet aux admins de tes serveurs de se connecter avec leur propre compte Discord (comme MEE6) pour gerer
+          uniquement leur serveur. Trouve-le dans l&apos;onglet OAuth2 de ton application Discord. Ajoute aussi{" "}
+          <code className="rounded bg-lavender-100 px-1">{process.env.NEXTAUTH_URL}/api/auth/callback/discord</code>{" "}
+          comme Redirect URI la-bas.
         </p>
 
         <button type="submit" className="bubble-btn rounded-full bg-blush-400 px-6 py-2.5 text-sm font-medium text-white shadow-glass">
