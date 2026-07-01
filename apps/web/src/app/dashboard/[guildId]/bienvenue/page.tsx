@@ -1,10 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels, getGuildRoles } from "@/lib/discord";
 
 const UPLOADS_DIR = join(process.cwd(), "public", "uploads");
+const MAX_BACKGROUND_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -33,14 +35,23 @@ async function saveWelcomeConfig(guildId: string, formData: FormData) {
 
   const file = formData.get("backgroundImage") as File | null;
   if (file && file.size > 0) {
+    if (file.size > MAX_BACKGROUND_BYTES) {
+      redirect(`/dashboard/${guildId}/bienvenue?error=trop_lourd`);
+    }
     const ext = ALLOWED_TYPES[file.type];
-    if (ext) {
+    if (!ext) {
+      redirect(`/dashboard/${guildId}/bienvenue?error=format`);
+    }
+    try {
       await mkdir(UPLOADS_DIR, { recursive: true });
       const filename = `welcome-${guildId}.${ext}`;
       const buffer = Buffer.from(await file.arrayBuffer());
       await writeFile(join(UPLOADS_DIR, filename), buffer);
       const baseUrl = process.env.NEXTAUTH_URL ?? "";
       imageBackgroundUrl = `${baseUrl}/uploads/${filename}?v=${Date.now()}`;
+    } catch (error) {
+      console.error("Echec de l'upload du fond de bienvenue", error);
+      redirect(`/dashboard/${guildId}/bienvenue?error=upload`);
     }
   }
 
@@ -51,9 +62,22 @@ async function saveWelcomeConfig(guildId: string, formData: FormData) {
   });
 
   revalidatePath(`/dashboard/${guildId}/bienvenue`);
+  redirect(`/dashboard/${guildId}/bienvenue?saved=1`);
 }
 
-export default async function BienvenuePage({ params }: { params: { guildId: string } }) {
+const ERROR_MESSAGES: Record<string, string> = {
+  trop_lourd: "Image trop lourde (max 10 Mo).",
+  format: "Format non supporte. Utilise PNG, JPG, WEBP ou GIF.",
+  upload: "Echec de l'enregistrement de l'image sur le serveur.",
+};
+
+export default async function BienvenuePage({
+  params,
+  searchParams,
+}: {
+  params: { guildId: string };
+  searchParams: { error?: string; saved?: string };
+}) {
   const guildId = params.guildId;
   const [config, channels, roles] = await Promise.all([
     prisma.welcomeConfig.findUnique({ where: { guildId } }),
@@ -68,6 +92,15 @@ export default async function BienvenuePage({ params }: { params: { guildId: str
       <h1 className="font-display mb-4 flex items-center gap-2 text-xl font-semibold text-lavender-900">
         <span aria-hidden="true">🎁</span> Configuration : Bienvenue
       </h1>
+
+      {searchParams.error && (
+        <p className="mb-4 rounded-xl bg-coral-100 px-4 py-2 text-sm text-coral-600">
+          {ERROR_MESSAGES[searchParams.error] ?? "Une erreur est survenue."}
+        </p>
+      )}
+      {searchParams.saved && (
+        <p className="mb-4 rounded-xl bg-aqua-100 px-4 py-2 text-sm text-aqua-800">Configuration enregistree.</p>
+      )}
 
       <div className="glass-panel mb-4 rounded-aero p-6 shadow-glass" style={{ background: "linear-gradient(135deg,#FAECE7,#FBEAF0)" }}>
         <div className="flex flex-wrap items-center gap-5">

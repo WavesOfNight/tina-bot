@@ -59,12 +59,14 @@ export async function generateWelcomeImage(
   if (backgroundUrl) {
     try {
       const backgroundImage = await loadImage(backgroundUrl);
-      drawImageCover(ctx, backgroundImage, 0, 0, WIDTH, HEIGHT);
-      ctx.fillStyle = "rgba(20, 16, 40, 0.45)";
+      ctx.filter = "blur(6px)";
+      drawImageCover(ctx, backgroundImage, -10, -10, WIDTH + 20, HEIGHT + 20);
+      ctx.filter = "none";
+      ctx.fillStyle = "rgba(20, 16, 40, 0.4)";
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       customBackgroundLoaded = true;
-    } catch {
-      // Custom background failed to load, fall back to the default gradient below.
+    } catch (error) {
+      console.error("Fond personnalise de bienvenue introuvable ou invalide, utilisation du degrade par defaut.", error);
     }
   }
 
