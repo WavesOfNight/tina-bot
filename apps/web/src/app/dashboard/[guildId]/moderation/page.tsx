@@ -26,9 +26,9 @@ const TYPE_LABELS: Record<string, string> = {
 
 const AUTOMOD_LEVELS = [
   { value: "OFF", label: "Desactivee", description: "Aucun filtre, tout passe." },
-  { value: "LOW", label: "Faible", description: "Filtre uniquement les propos les plus graves (racisme, insultes extremes)." },
-  { value: "MEDIUM", label: "Moyenne", description: "Filtre les insultes courantes (putain, connard, salope...), laisse passer le langage familier leger." },
-  { value: "HIGH", label: "Stricte", description: "Filtre tout, y compris le langage grossier leger (pipi, caca, merde...). Ideal pour un serveur familial." },
+  { value: "LOW", label: "Faible", description: "Filtre uniquement les propos les plus graves (racisme, insultes extremes), en FR/EN/DE/ES/IT." },
+  { value: "MEDIUM", label: "Moyenne", description: "Filtre les insultes courantes (putain, connard, fuck, scheisse, puta, cazzo...), en FR/EN/DE/ES/IT. Laisse passer le langage familier leger." },
+  { value: "HIGH", label: "Stricte", description: "Filtre tout, y compris le langage grossier leger (pipi, caca, merde, damn, mierda...), en FR/EN/DE/ES/IT. Ideal pour un serveur familial." },
 ];
 
 export default async function ModerationPage({ params }: { params: { guildId: string } }) {

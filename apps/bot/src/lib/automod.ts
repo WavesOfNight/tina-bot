@@ -1,37 +1,29 @@
-const LOW_WORDS = ["negro", "sale race", "sale juif", "sale arabe", "nazi de merde"];
+// Severe hate speech / slurs - blocked even at the lowest filter level.
+const LOW_FR = ["sale race", "sale juif", "sale arabe", "nazi de merde", "negro"];
+const LOW_EN = ["nigger", "nigga", "faggot", "retard", "kike", "chink", "spic", "tranny"];
+const LOW_DE = ["neger", "kanake", "schwuchtel"];
+const LOW_ES = ["negrata", "sudaca", "maricon de mierda"];
+const LOW_IT = ["negraccio", "frocio di merda", "terrone"];
 
-const MEDIUM_WORDS = [
-  ...LOW_WORDS,
-  "pute",
-  "putain",
-  "connard",
-  "connasse",
-  "enculé",
-  "encule",
-  "batard",
-  "bâtard",
-  "salope",
-  "fdp",
-  "ntm",
-  "nique ta mere",
-  "nique ta mère",
-];
+const LOW_WORDS = [...LOW_FR, ...LOW_EN, ...LOW_DE, ...LOW_ES, ...LOW_IT];
 
-const HIGH_WORDS = [
-  ...MEDIUM_WORDS,
-  "merde",
-  "chier",
-  "con",
-  "conne",
-  "cul",
-  "pd",
-  "pédé",
-  "pede",
-  "pipi",
-  "caca",
-  "boobs",
-  "sexe",
-];
+// Common swear words / insults - blocked from the medium level up.
+const MEDIUM_FR = ["pute", "putain", "connard", "connasse", "encule", "enculé", "batard", "bâtard", "salope", "fdp", "ntm", "nique ta mere", "nique ta mère"];
+const MEDIUM_EN = ["fuck", "fucking", "fucker", "bitch", "bastard", "asshole", "cunt", "motherfucker", "dick", "prick", "twat"];
+const MEDIUM_DE = ["scheisse", "scheiße", "hurensohn", "wichser", "arschloch", "fotze", "schlampe"];
+const MEDIUM_ES = ["puta", "puto", "cabron", "cabrón", "gilipollas", "hijo de puta", "mierda de mierda", "coño"];
+const MEDIUM_IT = ["puttana", "stronzo", "stronza", "coglione", "vaffanculo", "figlio di puttana", "troia"];
+
+const MEDIUM_WORDS = [...LOW_WORDS, ...MEDIUM_FR, ...MEDIUM_EN, ...MEDIUM_DE, ...MEDIUM_ES, ...MEDIUM_IT];
+
+// Mild language, still filtered at the strictest level (family-friendly servers).
+const HIGH_FR = ["merde", "chier", "con", "conne", "cul", "pd", "pédé", "pede", "pipi", "caca", "boobs", "sexe"];
+const HIGH_EN = ["damn", "crap", "hell", "piss", "boobs", "sex", "poop", "pee"];
+const HIGH_DE = ["scheisse leicht", "verdammt", "mist", "kacke", "pisse"];
+const HIGH_ES = ["mierda", "joder", "caca", "pis", "pedo", "culo"];
+const HIGH_IT = ["cazzo", "merda", "cacca", "pipi", "culo"];
+
+const HIGH_WORDS = [...MEDIUM_WORDS, ...HIGH_FR, ...HIGH_EN, ...HIGH_DE, ...HIGH_ES, ...HIGH_IT];
 
 const LEVEL_WORDS: Record<string, string[]> = {
   LOW: LOW_WORDS,

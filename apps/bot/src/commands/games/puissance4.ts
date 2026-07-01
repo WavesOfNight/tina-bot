@@ -3,10 +3,11 @@ import type { Command } from "../../types.js";
 import { COLS, connect4Games, createBoard, renderBoard } from "../../lib/connect4-store.js";
 
 export function buildColumnButtons(gameId: string, board: (null | 0 | 1)[][], disabled = false) {
-  const row = new ActionRowBuilder<ButtonBuilder>();
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [new ActionRowBuilder(), new ActionRowBuilder()];
   for (let col = 0; col < COLS; col++) {
     const full = board[0][col] !== null;
-    row.addComponents(
+    const targetRow = col < 4 ? rows[0] : rows[1];
+    targetRow.addComponents(
       new ButtonBuilder()
         .setCustomId(`puissance4:${gameId}:${col}`)
         .setLabel(`${col + 1}`)
@@ -14,7 +15,7 @@ export function buildColumnButtons(gameId: string, board: (null | 0 | 1)[][], di
         .setDisabled(disabled || full),
     );
   }
-  return [row];
+  return rows;
 }
 
 const command: Command = {
