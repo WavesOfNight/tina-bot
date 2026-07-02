@@ -11,21 +11,21 @@ import {
   type VoiceConnection,
 } from "@discordjs/voice";
 import prismMedia from "prism-media";
-import ffmpegPathImport from "ffmpeg-static";
 
 const { FFmpeg } = prismMedia;
 import type { Client } from "discord.js";
 import { prisma } from "@tina/database";
 
-const ffmpegPath = ffmpegPathImport as unknown as string | null;
-if (ffmpegPath) process.env.FFMPEG_PATH = ffmpegPath;
-
+// On utilise volontairement le ffmpeg du systeme (apt install ffmpeg) plutot que le
+// binaire precompile de ffmpeg-static : ce dernier peut segfault selon le CPU/hyperviseur
+// du serveur (constate en prod), alors que le paquet de la distribution est compile pour
+// tourner correctement dessus.
 try {
   const info = FFmpeg.getInfo();
   console.log(`FFmpeg detecte pour la radio : ${info.command} (version ${info.version})`);
 } catch (error) {
   console.error(
-    "FFmpeg introuvable ou non executable : la radio ne pourra pas diffuser de son tant que ce n'est pas corrige.",
+    "FFmpeg introuvable : installe-le avec 'sudo apt install ffmpeg' sur le serveur, la radio ne peut pas fonctionner sans.",
     error,
   );
 }

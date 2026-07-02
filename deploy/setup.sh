@@ -19,7 +19,7 @@ fi
 
 echo "==> Installing system packages"
 apt-get update -y
-apt-get install -y curl git nginx
+apt-get install -y curl git nginx ffmpeg
 
 if ! command -v node >/dev/null 2>&1; then
   echo "==> Installing Node.js 22.x"
