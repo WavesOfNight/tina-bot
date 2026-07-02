@@ -17,3 +17,12 @@ export async function verifyAdminCredentials(username: string, password: string)
   const valid = await bcrypt.compare(password, user.passwordHash);
   return valid ? user : null;
 }
+
+export async function changeAdminPassword(username: string, currentPassword: string, newPassword: string): Promise<boolean> {
+  const admin = await verifyAdminCredentials(username, currentPassword);
+  if (!admin) return false;
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await prisma.adminUser.update({ where: { id: admin.id }, data: { passwordHash } });
+  return true;
+}

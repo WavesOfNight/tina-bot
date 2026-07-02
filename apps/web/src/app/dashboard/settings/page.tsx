@@ -1,10 +1,24 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getBotConfig, prisma, setBotConfig, setTwitchConfig } from "@tina/database";
+import { changeAdminPassword, getBotConfig, prisma, setBotConfig, setTwitchConfig } from "@tina/database";
 import { auth, type SessionRole } from "@/auth";
 import { checkBotConnection } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
+
+async function changePassword(username: string, formData: FormData) {
+  "use server";
+  const currentPassword = formData.get("currentPassword") as string;
+  const newPassword = formData.get("newPassword") as string;
+  const confirmPassword = formData.get("confirmPassword") as string;
+
+  if (!currentPassword || !newPassword || newPassword.length < 8 || newPassword !== confirmPassword) {
+    redirect("/dashboard/settings?pwError=invalid");
+  }
+
+  const success = await changeAdminPassword(username, currentPassword, newPassword);
+  redirect(success ? "/dashboard/settings?pwSuccess=1" : "/dashboard/settings?pwError=wrong");
+}
 
 async function saveBotConfig(formData: FormData) {
   "use server";
@@ -67,11 +81,13 @@ const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   COMPETING: "Participe a",
 };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: { pwError?: string; pwSuccess?: string } }) {
   const session = await auth();
   if (!session) redirect("/login");
   const role = (session as typeof session & { role?: SessionRole }).role ?? "owner";
   if (role !== "owner") redirect("/dashboard");
+
+  const changePasswordAction = changePassword.bind(null, session.user?.name ?? "");
 
   const [config, connection, activities] = await Promise.all([
     getBotConfig(),
@@ -91,6 +107,43 @@ export default async function SettingsPage() {
           Retour aux serveurs
         </a>
       </div>
+
+      <h2 className="font-display mb-3 flex items-center gap-2 text-lg font-semibold text-lavender-900">
+        <span aria-hidden="true">🔐</span> Compte admin
+      </h2>
+      {searchParams.pwSuccess && (
+        <p className="mb-3 rounded-xl bg-aqua-100 px-4 py-2 text-sm text-aqua-800">Mot de passe change avec succes.</p>
+      )}
+      {searchParams.pwError === "invalid" && (
+        <p className="mb-3 rounded-xl bg-coral-100 px-4 py-2 text-sm text-coral-600">
+          Le nouveau mot de passe doit faire au moins 8 caracteres et etre identique dans les deux champs.
+        </p>
+      )}
+      {searchParams.pwError === "wrong" && (
+        <p className="mb-3 rounded-xl bg-coral-100 px-4 py-2 text-sm text-coral-600">Mot de passe actuel incorrect.</p>
+      )}
+      <form action={changePasswordAction} className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
+        <p className="mb-3 text-xs text-lavender-500">
+          Connecte en tant que <span className="font-medium text-lavender-800">{session.user?.name}</span>.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs text-lavender-600">Mot de passe actuel</label>
+            <input name="currentPassword" type="password" required className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-lavender-600">Nouveau mot de passe</label>
+            <input name="newPassword" type="password" required minLength={8} className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-lavender-600">Confirmer</label>
+            <input name="confirmPassword" type="password" required minLength={8} className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <button type="submit" className="bubble-btn mt-3 rounded-full bg-lavender-400 px-5 py-2 text-sm font-medium text-white shadow-glass">
+          Changer le mot de passe
+        </button>
+      </form>
 
       <div className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
         <p className="mb-1 text-sm font-medium text-lavender-800">Statut du token</p>
