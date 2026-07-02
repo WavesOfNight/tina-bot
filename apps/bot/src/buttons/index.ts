@@ -8,7 +8,19 @@ import poll from "./poll.js";
 import giveaway from "./giveaway.js";
 import reactionrole from "./reactionrole.js";
 import welcome from "./welcome.js";
+import blackjack from "./blackjack.js";
 
-export const buttonHandlers: ButtonHandler[] = [morpion, puissance4, chifumi, trivia, rumble, poll, giveaway, reactionrole, welcome];
+export const buttonHandlers: ButtonHandler[] = [
+  morpion,
+  puissance4,
+  chifumi,
+  trivia,
+  rumble,
+  poll,
+  giveaway,
+  reactionrole,
+  welcome,
+  blackjack,
+];
 
 export const buttonHandlerMap = new Map(buttonHandlers.map((handler) => [handler.prefix, handler]));

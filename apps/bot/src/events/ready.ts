@@ -8,6 +8,7 @@ import { checkSocialAlerts } from "../lib/social-alerts.js";
 import { updateStatsChannels } from "../lib/stats-channel.js";
 import { checkDueReminders } from "../lib/reminders.js";
 import { syncRadioPlayback } from "../lib/radio.js";
+import { syncPermanentInvites } from "../lib/invite.js";
 
 export const name = Events.ClientReady;
 export const once = true;
@@ -39,5 +40,6 @@ export async function execute(client: Client<true>) {
 
   setInterval(() => {
     updateStatsChannels(client).catch((error) => console.error("Erreur lors de la mise a jour des salons de stats", error));
+    syncPermanentInvites(client).catch((error) => console.error("Erreur lors de la synchronisation des invitations permanentes", error));
   }, 600_000);
 }

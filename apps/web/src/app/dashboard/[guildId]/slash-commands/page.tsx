@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { PageHeader } from "@/components/PageHeader";
+import { SlashSquare } from "lucide-react";
 
 const CATEGORIES: { label: string; commands: { name: string; description: string }[] }[] = [
   {
@@ -40,7 +41,12 @@ const CATEGORIES: { label: string; commands: { name: string; description: string
       { name: "bombe", description: "Jeu du mot le plus rapide" },
       { name: "histoire", description: "Histoire collaborative mot par mot" },
       { name: "combattre", description: "Battle royale textuel" },
+      { name: "pendu", description: "Pendu collaboratif, devine le mot lettre par lettre" },
     ],
+  },
+  {
+    label: "Jeux solo",
+    commands: [{ name: "blackjack", description: "Blackjack contre le croupier" }],
   },
   {
     label: "Niveaux",
@@ -99,7 +105,7 @@ export default async function SlashCommandsPage({ params }: { params: { guildId:
 
   return (
     <div>
-      <PageHeader icon="/" title={`Slash Commands (${totalCommands})`} subtitle="Active ou desactive chaque commande sur ce serveur" />
+      <PageHeader icon={SlashSquare} title={`Slash Commands (${totalCommands})`} subtitle="Active ou desactive chaque commande sur ce serveur" />
 
       {CATEGORIES.map((category) => (
         <div key={category.label} className="mb-4">

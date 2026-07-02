@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { PageHeader } from "@/components/PageHeader";
+import { Keyboard } from "lucide-react";
 
 async function addCommand(guildId: string, formData: FormData) {
   "use server";
@@ -54,7 +55,7 @@ export default async function CommandesPage({ params }: { params: { guildId: str
 
   return (
     <div>
-      <PageHeader icon="⌨️" title={`Commandes Perso (${commands.length})`} subtitle="Commandes texte et reponses automatiques" />
+      <PageHeader icon={Keyboard} title={`Commandes Perso (${commands.length})`} subtitle="Commandes texte et reponses automatiques" />
 
       <form action={add} className="glass-panel mb-4 flex flex-wrap items-end gap-3 rounded-aero p-5 shadow-glass">
         <div>

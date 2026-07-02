@@ -57,6 +57,21 @@ export async function getGuildRoles(guildId: string) {
   return roles.filter((r) => !r.managed && r.name !== "@everyone");
 }
 
+export async function createPermanentInvite(channelId: string): Promise<{ code: string } | null> {
+  const config = await getBotConfig();
+  if (!config) return null;
+
+  const res = await fetch(`https://discord.com/api/channels/${channelId}/invites`, {
+    method: "POST",
+    headers: { Authorization: `Bot ${config.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ max_age: 0, max_uses: 0, unique: false }),
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const invite = (await res.json()) as { code: string };
+  return { code: invite.code };
+}
+
 export async function checkBotConnection(): Promise<{ connected: boolean; tag?: string }> {
   const config = await getBotConfig();
   if (!config) return { connected: false };

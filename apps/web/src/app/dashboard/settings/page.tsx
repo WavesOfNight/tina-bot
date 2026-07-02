@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { changeAdminPassword, getBotConfig, prisma, setBotConfig, setTwitchConfig } from "@tina/database";
 import { auth, type SessionRole } from "@/auth";
 import { checkBotConnection } from "@/lib/discord";
+import { Settings } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +103,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: { p
   return (
     <main className="mx-auto max-w-2xl p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-display text-2xl font-semibold text-lavender-900">Parametres du bot</h1>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-discord-400 text-white shadow-glass">
+            <Settings size={19} strokeWidth={2.25} aria-hidden="true" />
+          </div>
+          <h1 className="font-display text-2xl font-semibold text-lavender-900">Parametres du bot</h1>
+        </div>
         <a href="/dashboard" className="text-sm text-lavender-600 underline">
           Retour aux serveurs
         </a>

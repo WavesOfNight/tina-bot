@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
+import { PartyPopper } from "lucide-react";
 
 async function createGiveaway(guildId: string, formData: FormData) {
   "use server";
@@ -42,7 +43,7 @@ export default async function GiveawaysPage({ params }: { params: { guildId: str
 
   return (
     <div>
-      <PageHeader icon="🎉" title="Giveaways" subtitle="Lance et gere des concours avec participation par bouton" />
+      <PageHeader icon={PartyPopper} title="Giveaways" subtitle="Lance et gere des concours avec participation par bouton" />
 
       <form action={create} className="glass-panel mb-4 flex flex-wrap items-end gap-3 rounded-aero p-5 shadow-glass">
         <div>

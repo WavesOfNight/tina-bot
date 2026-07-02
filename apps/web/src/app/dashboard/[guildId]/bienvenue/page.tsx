@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels, getGuildRoles } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
+import { Gift } from "lucide-react";
 
 const UPLOADS_DIR = join(process.cwd(), "public", "uploads");
 const MAX_BACKGROUND_BYTES = 10 * 1024 * 1024;
@@ -90,7 +91,7 @@ export default async function BienvenuePage({
 
   return (
     <div>
-      <PageHeader icon="🎁" title="Configuration : Bienvenue" subtitle="Message, image et roles a l'arrivee des membres" />
+      <PageHeader icon={Gift} title="Configuration : Bienvenue" subtitle="Message, image et roles a l'arrivee des membres" />
 
       {searchParams.error && (
         <p className="mb-4 rounded-xl bg-coral-100 px-4 py-2 text-sm text-coral-600">

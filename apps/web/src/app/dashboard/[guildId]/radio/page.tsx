@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
+import { Radio as RadioIcon } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function RadioPage({ params }: { params: { guildId: string 
 
   return (
     <div>
-      <PageHeader icon="📻" title="Radio" subtitle="Diffuse la radio READS dans un salon vocal" />
+      <PageHeader icon={RadioIcon} title="Radio" subtitle="Diffuse la radio READS dans un salon vocal" />
 
       <div className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
         <div className="mb-4 flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { prisma } from "@tina/database";
 import { PageHeader } from "@/components/PageHeader";
+import { Gamepad2 } from "lucide-react";
 
 const GAMES = [
   { key: "MORPION", command: "/morpion", description: "Defie un membre au tic-tac-toe via des boutons.", statLabel: (g: { wins: number; losses: number; draws: number }) => `${g.wins}V / ${g.losses}D / ${g.draws}N` },
@@ -9,6 +10,8 @@ const GAMES = [
   { key: "BOMBE", command: "/bombe", description: "Trouve un mot contenant la syllabe donnee en moins de 10s.", statLabel: (g: { wins: number; plays: number }) => `${g.wins} bombes desamorcees` },
   { key: "RUMBLE", command: "/combattre", description: "Battle royale textuel jusqu'a 30 joueurs, elimination toutes les 5s.", statLabel: (g: { wins: number }) => `${g.wins} victoire(s)` },
   { key: "LOTO", command: "/loto", description: "Choisis 3 numeros entre 1 et 49 et tente de trouver le tirage.", statLabel: (g: { wins: number; plays: number }) => `${g.wins} jackpot(s) / ${g.plays} parties` },
+  { key: "PENDU", command: "/pendu", description: "Devine le mot lettre par lettre avant que le pendu soit complet.", statLabel: (g: { wins: number; plays: number }) => `${g.wins} mot(s) trouve(s) / ${g.plays} parties` },
+  { key: "BLACKJACK", command: "/blackjack", description: "Affronte le croupier, le plus proche de 21 sans depasser gagne.", statLabel: (g: { wins: number; losses: number; draws: number }) => `${g.wins}V / ${g.losses}D / ${g.draws}N` },
 ];
 
 export default async function JeuxPage({ params }: { params: { guildId: string } }) {
@@ -21,7 +24,7 @@ export default async function JeuxPage({ params }: { params: { guildId: string }
 
   return (
     <div>
-      <PageHeader icon="🎮" title="Jeux" subtitle="Toutes les stats des jeux du serveur" />
+      <PageHeader icon={Gamepad2} title="Jeux" subtitle="Toutes les stats des jeux du serveur" />
       <p className="mb-4 text-sm text-lavender-600">
         Jeux au tour par tour, party games et le battle royale <span className="font-medium">/combattre</span> — tous
         fonctionnent des la commande, aucune configuration requise ici, juste les stats.

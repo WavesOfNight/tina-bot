@@ -10,6 +10,8 @@ import trivia from "./games/trivia.js";
 import bombe from "./games/bombe.js";
 import histoire from "./games/histoire.js";
 import rumble from "./games/rumble.js";
+import pendu from "./games/pendu.js";
+import blackjack from "./games/blackjack.js";
 import ban from "./moderation/ban.js";
 import kick from "./moderation/kick.js";
 import mute from "./moderation/mute.js";
@@ -36,6 +38,7 @@ import roleinfo from "./utility/roleinfo.js";
 import eightball from "./utility/8ball.js";
 import poll from "./utility/poll.js";
 import remindme from "./utility/remindme.js";
+import invite from "./utility/invite.js";
 
 export const commands: Command[] = [
   hello,
@@ -49,6 +52,8 @@ export const commands: Command[] = [
   bombe,
   histoire,
   rumble,
+  pendu,
+  blackjack,
   ban,
   kick,
   mute,
@@ -75,6 +80,7 @@ export const commands: Command[] = [
   eightball,
   poll,
   remindme,
+  invite,
 ];
 
 export const commandMap = new Map(commands.map((command) => [command.data.name, command]));

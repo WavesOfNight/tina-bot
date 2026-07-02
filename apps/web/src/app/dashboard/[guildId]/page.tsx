@@ -1,5 +1,6 @@
 import { prisma } from "@tina/database";
 import { PageHeader } from "@/components/PageHeader";
+import { LayoutDashboard } from "lucide-react";
 
 const TYPE_LABELS: Record<string, string> = {
   WARN: "Avertissement",
@@ -36,7 +37,7 @@ export default async function OverviewPage({ params }: { params: { guildId: stri
 
   return (
     <div>
-      <PageHeader icon="🏠" title="Tableau de bord" subtitle="Vue d'ensemble de ton serveur" />
+      <PageHeader icon={LayoutDashboard} title="Tableau de bord" subtitle="Vue d'ensemble de ton serveur" />
 
       <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
         {cards.map((card) => (

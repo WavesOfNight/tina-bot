@@ -45,6 +45,13 @@ const config: Config = {
           400: "#D85A30",
           600: "#993C1D",
         },
+        discord: {
+          50: "#EEF0FE",
+          100: "#DFE3FD",
+          400: "#5865F2",
+          500: "#4752C4",
+          600: "#3C45A5",
+        },
       },
       borderRadius: {
         aero: "22px",

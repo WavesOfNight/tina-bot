@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels, getGuildRoles } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
+import { MousePointerClick } from "lucide-react";
 
 async function createMessage(guildId: string, formData: FormData) {
   "use server";
@@ -42,7 +43,7 @@ export default async function ReactionButtonsPage({ params }: { params: { guildI
 
   return (
     <div>
-      <PageHeader icon="🖱️" title="Reaction Buttons" subtitle="Attribue des roles en un clic" />
+      <PageHeader icon={MousePointerClick} title="Reaction Buttons" subtitle="Attribue des roles en un clic" />
 
       <form action={create} className="glass-panel mb-4 flex flex-wrap items-end gap-3 rounded-aero p-5 shadow-glass">
         <div className="flex-1">

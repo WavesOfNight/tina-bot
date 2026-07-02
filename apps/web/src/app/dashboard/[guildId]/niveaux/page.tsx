@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildRoles } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
+import { Trophy } from "lucide-react";
 
 async function addReward(guildId: string, formData: FormData) {
   "use server";
@@ -36,7 +37,7 @@ export default async function NiveauxPage({ params }: { params: { guildId: strin
 
   return (
     <div>
-      <PageHeader icon="🏆" title="Niveaux (Nv 1-50)" subtitle="Classement et recompenses de niveau" />
+      <PageHeader icon={Trophy} title="Niveaux (Nv 1-50)" subtitle="Classement et recompenses de niveau" />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="glass-panel rounded-aero p-5 shadow-glass">

@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
+import { ShieldCheck } from "lucide-react";
 
 async function saveModConfig(guildId: string, formData: FormData) {
   "use server";
@@ -68,7 +69,7 @@ export default async function ModerationPage({ params }: { params: { guildId: st
 
   return (
     <div>
-      <PageHeader icon="🛡️" title="Moderation" subtitle="Filtres automatiques, escalade et logs" />
+      <PageHeader icon={ShieldCheck} title="Moderation" subtitle="Filtres automatiques, escalade et logs" />
 
       <form action={save} className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
         <label className="mb-1 block text-xs text-lavender-600">Salon de logs de moderation</label>

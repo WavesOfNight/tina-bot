@@ -1,4 +1,5 @@
 import { signOut } from "@/auth";
+import { ArrowLeftRight, Monitor, Settings, LogOut } from "lucide-react";
 
 export function Topbar({
   guildName,
@@ -22,17 +23,25 @@ export function Topbar({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={`https://cdn.discordapp.com/icons/${guildId}/${guildIcon}.png`} alt={guildName} className="h-5 w-5 rounded-full" />
         ) : (
-          <span aria-hidden="true">🖥️</span>
+          <Monitor size={16} className="text-lavender-500" aria-hidden="true" />
         )}
         <span className="font-medium text-lavender-900">{guildName}</span>
       </div>
       <div className="flex items-center gap-3">
-        <a href="/dashboard" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-lavender-600" title="Changer de serveur">
-          ⇄
+        <a
+          href="/dashboard"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-lavender-600 transition-colors hover:bg-discord-100 hover:text-discord-500"
+          title="Changer de serveur"
+        >
+          <ArrowLeftRight size={15} aria-hidden="true" />
         </a>
         {showSettingsLink && (
-          <a href="/dashboard/settings" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-lavender-600" title="Parametres du bot">
-            ⚙️
+          <a
+            href="/dashboard/settings"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-lavender-600 transition-colors hover:bg-discord-100 hover:text-discord-500"
+            title="Parametres du bot"
+          >
+            <Settings size={15} aria-hidden="true" />
           </a>
         )}
         <div className="flex items-center gap-2 rounded-full bg-white/70 py-1 pl-1 pr-3">
@@ -50,8 +59,12 @@ export function Topbar({
             await signOut({ redirectTo: "/login" });
           }}
         >
-          <button type="submit" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-lavender-600" title="Se deconnecter">
-            ⏻
+          <button
+            type="submit"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/70 text-lavender-600 transition-colors hover:bg-coral-100 hover:text-coral-600"
+            title="Se deconnecter"
+          >
+            <LogOut size={15} aria-hidden="true" />
           </button>
         </form>
       </div>

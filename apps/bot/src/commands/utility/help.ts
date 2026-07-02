@@ -4,7 +4,7 @@ import type { Command } from "../../types.js";
 const CATEGORIES = [
   {
     name: "🛠️ Utilitaires",
-    value: "`/ping` `/userinfo` `/serverinfo` `/avatar` `/roleinfo` `/poll` `/remindme` `/8ball`",
+    value: "`/ping` `/userinfo` `/serverinfo` `/avatar` `/roleinfo` `/poll` `/remindme` `/8ball` `/invite`",
   },
   {
     name: "🎉 Fun",
@@ -16,7 +16,11 @@ const CATEGORIES = [
   },
   {
     name: "👥 Jeux en groupe",
-    value: "`/trivia` `/bombe` `/histoire` `/combattre`",
+    value: "`/trivia` `/bombe` `/histoire` `/combattre` `/pendu`",
+  },
+  {
+    name: "🃏 Jeux solo",
+    value: "`/blackjack`",
   },
   {
     name: "🏆 Niveaux",

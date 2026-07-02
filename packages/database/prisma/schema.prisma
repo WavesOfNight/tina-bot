@@ -53,6 +53,8 @@ model Guild {
   statsChannelId      String?
   radioChannelId      String?
   radioEnabled        Boolean  @default(false)
+  permanentInviteCode      String?
+  permanentInviteChannelId String?
   createdAt           DateTime @default(now())
 
   welcomeConfig      WelcomeConfig?

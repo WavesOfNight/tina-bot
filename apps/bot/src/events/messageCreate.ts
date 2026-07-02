@@ -6,6 +6,8 @@ import { bombeRounds } from "../lib/bombe-store.js";
 import { findAutoModMatch } from "../lib/automod.js";
 import { hasExcessiveCaps, isSpam, matchesInvite, matchesLink } from "../lib/automod-filters.js";
 import { applyWarnEscalation, logCase } from "../lib/moderation.js";
+import { isWordComplete, penduRounds } from "../lib/pendu-store.js";
+import { buildPenduEmbed } from "../commands/games/pendu.js";
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -50,6 +52,11 @@ export async function execute(message: Message) {
     }
   }
 
+  const penduRound = penduRounds.get(message.channelId);
+  if (penduRound?.active) {
+    await handlePenduGuess(message, channel);
+  }
+
   const result = await grantMessageXp(message.guild.id, message.author.id);
   if (result?.leveledUp) {
     await channel
@@ -86,6 +93,56 @@ export async function execute(message: Message) {
   if (autoResponse && !isBlockedByFilter(autoResponse.response, guildData)) {
     await channel.send(autoResponse.response).catch(() => null);
   }
+}
+
+async function handlePenduGuess(message: Message, channel: TextChannel) {
+  const round = penduRounds.get(message.channelId);
+  if (!round?.active || !message.guild) return;
+
+  const normalized = message.content
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+
+  const isSingleLetterGuess = /^[A-Z]$/.test(normalized) && !round.guessedLetters.has(normalized);
+  const isFullWordGuess = normalized.length > 1 && /^[A-Z]+$/.test(normalized);
+  if (!isSingleLetterGuess && !(isFullWordGuess && normalized === round.word)) return;
+
+  if (isFullWordGuess) {
+    round.word.split("").forEach((letter) => round.guessedLetters.add(letter));
+  } else {
+    round.guessedLetters.add(normalized);
+    if (!round.word.includes(normalized)) round.wrongGuesses += 1;
+  }
+
+  const roundMessage = await channel.messages.fetch(round.messageId).catch(() => null);
+
+  if (isWordComplete(round)) {
+    round.active = false;
+    penduRounds.delete(message.channelId);
+    await prisma.guild.upsert({ where: { id: message.guild.id }, create: { id: message.guild.id }, update: {} });
+    await prisma.gameStat.upsert({
+      where: { guildId_userId_game: { guildId: message.guild.id, userId: message.author.id, game: "PENDU" } },
+      create: { guildId: message.guild.id, userId: message.author.id, game: "PENDU", plays: 1, wins: 1 },
+      update: { plays: { increment: 1 }, wins: { increment: 1 } },
+    });
+    await roundMessage
+      ?.edit({ embeds: [buildPenduEmbed(round, `${message.author.username} a trouve le mot : ${round.word} !`)] })
+      .catch(() => null);
+    return;
+  }
+
+  if (round.wrongGuesses >= round.maxWrong) {
+    round.active = false;
+    penduRounds.delete(message.channelId);
+    await roundMessage
+      ?.edit({ embeds: [buildPenduEmbed(round, `Perdu ! Le mot etait : ${round.word}`)] })
+      .catch(() => null);
+    return;
+  }
+
+  await roundMessage?.edit({ embeds: [buildPenduEmbed(round, "Tape une lettre ou le mot complet dans le chat !")] }).catch(() => null);
 }
 
 function isBlockedByFilter(
