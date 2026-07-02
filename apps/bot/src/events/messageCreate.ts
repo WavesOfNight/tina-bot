@@ -8,6 +8,7 @@ import { hasExcessiveCaps, isSpam, matchesInvite, matchesLink } from "../lib/aut
 import { applyWarnEscalation, logCase } from "../lib/moderation.js";
 import { isWordComplete, penduRounds } from "../lib/pendu-store.js";
 import { buildPenduEmbed } from "../commands/games/pendu.js";
+import { runActionChain } from "../lib/action-chain.js";
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -81,9 +82,18 @@ export async function execute(message: Message) {
     if (commandName) {
       const customCommand = await prisma.customCommand.findUnique({
         where: { guildId_name: { guildId: message.guild.id, name: commandName } },
+        include: { actions: true },
       });
-      if (customCommand && !isBlockedByFilter(customCommand.response, guildData)) {
-        await channel.send(customCommand.response).catch(() => null);
+      if (customCommand) {
+        if (customCommand.actions.length > 0) {
+          if (message.member) {
+            await runActionChain(customCommand.actions, { message, member: message.member, guild: message.guild }, (text) =>
+              isBlockedByFilter(text, guildData),
+            );
+          }
+        } else if (!isBlockedByFilter(customCommand.response, guildData)) {
+          await channel.send(customCommand.response).catch(() => null);
+        }
         return;
       }
     }

@@ -12,6 +12,8 @@ const GAMES = [
   { key: "LOTO", command: "/loto", description: "Choisis 3 numeros entre 1 et 49 et tente de trouver le tirage.", statLabel: (g: { wins: number; plays: number }) => `${g.wins} jackpot(s) / ${g.plays} parties` },
   { key: "PENDU", command: "/pendu", description: "Devine le mot lettre par lettre avant que le pendu soit complet.", statLabel: (g: { wins: number; plays: number }) => `${g.wins} mot(s) trouve(s) / ${g.plays} parties` },
   { key: "BLACKJACK", command: "/blackjack", description: "Affronte le croupier, le plus proche de 21 sans depasser gagne.", statLabel: (g: { wins: number; losses: number; draws: number }) => `${g.wins}V / ${g.losses}D / ${g.draws}N` },
+  { key: "ECHECS", command: "/echecs", description: "Echecs complets en duel : coups, echec et mat, pat.", statLabel: (g: { wins: number; losses: number; draws: number }) => `${g.wins}V / ${g.losses}D / ${g.draws}N` },
+  { key: "DAMES", command: "/dames", description: "Dames en duel : deplacements et prises en diagonale.", statLabel: (g: { wins: number; losses: number; draws: number }) => `${g.wins}V / ${g.losses}D / ${g.draws}N` },
 ];
 
 export default async function JeuxPage({ params }: { params: { guildId: string } }) {

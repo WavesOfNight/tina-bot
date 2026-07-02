@@ -12,6 +12,8 @@ import histoire from "./games/histoire.js";
 import rumble from "./games/rumble.js";
 import pendu from "./games/pendu.js";
 import blackjack from "./games/blackjack.js";
+import echecs from "./games/echecs.js";
+import dames from "./games/dames.js";
 import ban from "./moderation/ban.js";
 import kick from "./moderation/kick.js";
 import mute from "./moderation/mute.js";
@@ -54,6 +56,8 @@ export const commands: Command[] = [
   rumble,
   pendu,
   blackjack,
+  echecs,
+  dames,
   ban,
   kick,
   mute,

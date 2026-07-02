@@ -181,8 +181,21 @@ model CustomCommand {
   name      String
   response  String
   createdAt DateTime @default(now())
+  actions   CustomCommandAction[]
 
   @@unique([guildId, name])
+}
+
+model CustomCommandAction {
+  id              Int           @id @default(autoincrement())
+  customCommand   CustomCommand @relation(fields: [customCommandId], references: [id], onDelete: Cascade)
+  customCommandId Int
+  order           Int
+  type            String
+  config          String
+  createdAt       DateTime      @default(now())
+
+  @@index([customCommandId])
 }
 
 model Giveaway {

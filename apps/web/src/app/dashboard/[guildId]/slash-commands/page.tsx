@@ -32,6 +32,8 @@ const CATEGORIES: { label: string; commands: { name: string; description: string
       { name: "puissance4", description: "Partie de puissance 4 (manches disponibles)" },
       { name: "chifumi", description: "Pierre-feuille-ciseaux en duel (manches disponibles)" },
       { name: "loto", description: "Jeu du loto" },
+      { name: "echecs", description: "Echecs complets en duel" },
+      { name: "dames", description: "Dames en duel" },
     ],
   },
   {

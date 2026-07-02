@@ -12,7 +12,7 @@ const CATEGORIES = [
   },
   {
     name: "🎮 Jeux en duel",
-    value: "`/morpion` `/puissance4` `/chifumi` `/loto` — ajoute `manches:3` ou `manches:5` pour un match !",
+    value: "`/morpion` `/puissance4` `/chifumi` `/loto` `/echecs` `/dames` — ajoute `manches:3` ou `manches:5` pour un match !",
   },
   {
     name: "👥 Jeux en groupe",
