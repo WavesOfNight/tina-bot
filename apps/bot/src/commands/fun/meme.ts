@@ -13,8 +13,8 @@ interface MemeApiResponse {
   spoiler?: boolean;
 }
 
-// Subreddits reserves quand aucun n'est precise : plus tranquilles que le pool par defaut de l'API.
-const SAFE_SUBREDDITS = ["wholesomememes", "memes", "ProgrammerHumor", "MemeEconomy"];
+// Subreddits francophones utilises quand aucun n'est precise.
+const SAFE_SUBREDDITS = ["rance", "MemesFR", "france"];
 const MAX_ATTEMPTS = 5;
 
 function isClean(meme: MemeApiResponse): boolean {
