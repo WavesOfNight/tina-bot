@@ -10,8 +10,10 @@ import {
   type AudioPlayer,
   type VoiceConnection,
 } from "@discordjs/voice";
-import { FFmpeg } from "prism-media";
+import prismMedia from "prism-media";
 import ffmpegPathImport from "ffmpeg-static";
+
+const { FFmpeg } = prismMedia;
 import type { Client } from "discord.js";
 import { prisma } from "@tina/database";
 
