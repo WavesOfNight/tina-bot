@@ -6,10 +6,34 @@ async function saveModConfig(guildId: string, formData: FormData) {
   "use server";
   const modLogChannelId = (formData.get("modLogChannelId") as string) || null;
   const autoModLevel = (formData.get("autoModLevel") as string) || "OFF";
+  const filterInvites = formData.get("filterInvites") === "on";
+  const filterLinks = formData.get("filterLinks") === "on";
+  const filterCaps = formData.get("filterCaps") === "on";
+  const filterSpam = formData.get("filterSpam") === "on";
+  const parseThreshold = (name: string) => {
+    const raw = (formData.get(name) as string)?.trim();
+    return raw ? Number(raw) : null;
+  };
+  const warnMuteThreshold = parseThreshold("warnMuteThreshold");
+  const warnKickThreshold = parseThreshold("warnKickThreshold");
+  const warnBanThreshold = parseThreshold("warnBanThreshold");
+
+  const data = {
+    modLogChannelId,
+    autoModLevel,
+    filterInvites,
+    filterLinks,
+    filterCaps,
+    filterSpam,
+    warnMuteThreshold,
+    warnKickThreshold,
+    warnBanThreshold,
+  };
+
   await prisma.guild.upsert({
     where: { id: guildId },
-    create: { id: guildId, modLogChannelId, autoModLevel },
-    update: { modLogChannelId, autoModLevel },
+    create: { id: guildId, ...data },
+    update: data,
   });
   revalidatePath(`/dashboard/${guildId}/moderation`);
 }
@@ -25,7 +49,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const AUTOMOD_LEVELS = [
-  { value: "OFF", label: "Desactivee", description: "Aucun filtre, tout passe." },
+  { value: "OFF", label: "Desactivee", description: "Aucun filtre de mots, tout passe." },
   { value: "LOW", label: "Faible", description: "Filtre uniquement les propos les plus graves (racisme, insultes extremes), en FR/EN/DE/ES/IT." },
   { value: "MEDIUM", label: "Moyenne", description: "Filtre les insultes courantes (putain, connard, fuck, scheisse, puta, cazzo...), en FR/EN/DE/ES/IT. Laisse passer le langage familier leger." },
   { value: "HIGH", label: "Stricte", description: "Filtre tout, y compris le langage grossier leger (pipi, caca, merde, damn, mierda...), en FR/EN/DE/ES/IT. Ideal pour un serveur familial." },
@@ -58,11 +82,7 @@ export default async function ModerationPage({ params }: { params: { guildId: st
           ))}
         </select>
 
-        <h2 className="mb-2 text-sm font-medium text-lavender-800">Moderation automatique</h2>
-        <p className="mb-2 text-xs text-lavender-500">
-          Supprime automatiquement les messages contenant des mots interdits, selon le niveau choisi. C&apos;est a
-          l&apos;admin du serveur de decider du niveau adapte.
-        </p>
+        <h2 className="mb-2 text-sm font-medium text-lavender-800">Filtre de mots automatique</h2>
         <div className="mb-4 space-y-2">
           {AUTOMOD_LEVELS.map((level) => (
             <label key={level.value} className="flex items-start gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
@@ -79,6 +99,42 @@ export default async function ModerationPage({ params }: { params: { guildId: st
               </span>
             </label>
           ))}
+        </div>
+
+        <h2 className="mb-2 text-sm font-medium text-lavender-800">Autres filtres</h2>
+        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+            <input type="checkbox" name="filterInvites" defaultChecked={guild?.filterInvites ?? false} /> Bloquer les invitations Discord
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+            <input type="checkbox" name="filterLinks" defaultChecked={guild?.filterLinks ?? false} /> Bloquer tous les liens externes
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+            <input type="checkbox" name="filterCaps" defaultChecked={guild?.filterCaps ?? false} /> Bloquer les MAJUSCULES excessives
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+            <input type="checkbox" name="filterSpam" defaultChecked={guild?.filterSpam ?? false} /> Bloquer le spam (messages repetes)
+          </label>
+        </div>
+
+        <h2 className="mb-2 text-sm font-medium text-lavender-800">Escalade automatique des avertissements</h2>
+        <p className="mb-2 text-xs text-lavender-500">
+          Les avertissements manuels (/warn) et automatiques (filtres ci-dessus) comptent ensemble. Laisse vide pour
+          desactiver un palier.
+        </p>
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs text-lavender-600">Mute (24h) apres</label>
+            <input type="number" name="warnMuteThreshold" min={1} defaultValue={guild?.warnMuteThreshold ?? ""} placeholder="ex: 2" className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-lavender-600">Kick apres</label>
+            <input type="number" name="warnKickThreshold" min={1} defaultValue={guild?.warnKickThreshold ?? ""} placeholder="ex: 4" className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-lavender-600">Ban apres</label>
+            <input type="number" name="warnBanThreshold" min={1} defaultValue={guild?.warnBanThreshold ?? ""} placeholder="ex: 6" className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+          </div>
         </div>
 
         <button type="submit" className="bubble-btn rounded-full bg-lavender-400 px-5 py-2 text-sm font-medium text-white shadow-glass">

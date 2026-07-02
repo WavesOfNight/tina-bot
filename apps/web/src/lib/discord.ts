@@ -31,7 +31,7 @@ export async function getGuildInfo(guildId: string) {
   return (await res.json()) as { id: string; name: string; icon: string | null; approximate_member_count?: number };
 }
 
-export async function getGuildChannels(guildId: string) {
+export async function getGuildChannels(guildId: string, type = 0) {
   const config = await getBotConfig();
   if (!config) return [];
 
@@ -41,7 +41,7 @@ export async function getGuildChannels(guildId: string) {
   });
   if (!res.ok) return [];
   const channels: { id: string; name: string; type: number }[] = await res.json();
-  return channels.filter((c) => c.type === 0).sort((a, b) => a.name.localeCompare(b.name));
+  return channels.filter((c) => c.type === type).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getGuildRoles(guildId: string) {

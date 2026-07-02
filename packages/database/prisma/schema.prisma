@@ -15,20 +15,30 @@ model AdminUser {
 }
 
 model BotConfig {
-  id                      Int      @id @default(1)
-  clientId                String
-  tokenEncrypted          String
-  clientSecretEncrypted   String?
-  updatedAt               DateTime @updatedAt
+  id                          Int      @id @default(1)
+  clientId                    String
+  tokenEncrypted              String
+  clientSecretEncrypted       String?
+  twitchClientId               String?
+  twitchClientSecretEncrypted String?
+  updatedAt                   DateTime @updatedAt
 }
 
 model Guild {
-  id             String   @id
-  name           String?
-  prefix         String   @default("!")
-  modLogChannelId String?
-  autoModLevel   String   @default("OFF")
-  createdAt      DateTime @default(now())
+  id                  String   @id
+  name                String?
+  prefix              String   @default("!")
+  modLogChannelId     String?
+  autoModLevel        String   @default("OFF")
+  filterInvites       Boolean  @default(false)
+  filterLinks         Boolean  @default(false)
+  filterCaps          Boolean  @default(false)
+  filterSpam          Boolean  @default(false)
+  warnMuteThreshold   Int?
+  warnKickThreshold   Int?
+  warnBanThreshold    Int?
+  statsChannelId      String?
+  createdAt           DateTime @default(now())
 
   welcomeConfig      WelcomeConfig?
   members            Member[]
@@ -41,6 +51,21 @@ model Guild {
   gameStats          GameStat[]
   slashCommandToggle SlashCommandToggle[]
   collabStory        CollabStory?
+  socialAlerts       SocialAlert[]
+}
+
+model SocialAlert {
+  id               Int      @id @default(autoincrement())
+  guild            Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId          String
+  platform         String
+  channelRef       String
+  discordChannelId String
+  message          String   @default("{channel} vient de publier du nouveau contenu ! {url}")
+  lastSeenId       String?
+  createdAt        DateTime @default(now())
+
+  @@unique([guildId, platform, channelRef])
 }
 
 model CollabStory {
@@ -126,6 +151,7 @@ model ModerationCase {
   type        String
   reason      String?
   expiresAt   DateTime?
+  resolved    Boolean   @default(false)
   createdAt   DateTime  @default(now())
 
   @@index([guildId, userId])

@@ -1,6 +1,6 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
-import { logCase } from "../../lib/moderation.js";
+import { applyWarnEscalation, logCase } from "../../lib/moderation.js";
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -23,6 +23,7 @@ const command: Command = {
     });
 
     await target.send(`Tu as recu un avertissement sur **${interaction.guild.name}** : ${reason}`).catch(() => null);
+    await applyWarnEscalation(interaction.guild, target.id);
 
     await interaction.reply(`${target.tag} a recu l'avertissement #${moderationCase.id}. Raison : ${reason}`);
   },

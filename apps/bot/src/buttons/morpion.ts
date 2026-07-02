@@ -1,7 +1,9 @@
+import type { TextChannel } from "discord.js";
 import { prisma } from "@tina/database";
 import type { ButtonHandler } from "../types.js";
 import { morpionGames, checkWinner } from "../lib/morpion-store.js";
-import { buildBoardRows } from "../commands/games/morpion.js";
+import { buildBoardRows, startMorpionRound } from "../commands/games/morpion.js";
+import { recordRoundResult, matchScoreLine, matches } from "../lib/match-store.js";
 
 async function bumpStat(guildId: string, userId: string, field: "wins" | "losses" | "draws") {
   await prisma.guild.upsert({ where: { id: guildId }, create: { id: guildId }, update: {} });
@@ -10,6 +12,20 @@ async function bumpStat(guildId: string, userId: string, field: "wins" | "losses
     create: { guildId, userId, game: "MORPION", plays: 1, [field]: 1 },
     update: { plays: { increment: 1 }, [field]: { increment: 1 } },
   });
+}
+
+async function startNextRound(channel: TextChannel, players: [string, string], guildId: string, matchId: string) {
+  const match = matches.get(matchId);
+  const roundLabel = match ? ` (manche ${match.round}/${match.roundsToWin * 2 - 1})` : "";
+  const round = startMorpionRound(players, guildId, matchId);
+
+  const message = await channel.send({
+    content: `Morpion : <@${players[0]}> (X) contre <@${players[1]}> (O)${roundLabel}. A <@${players[0]}> de jouer !`,
+    components: buildBoardRows("pending", round.board),
+  });
+
+  morpionGames.set(message.id, round);
+  await message.edit({ components: buildBoardRows(message.id, round.board) }).catch(() => null);
 }
 
 const handler: ButtonHandler = {
@@ -45,24 +61,45 @@ const handler: ButtonHandler = {
     if (result) {
       morpionGames.delete(gameId);
       const [p1, p2] = game.players;
+      const isDraw = result === "draw";
+      const roundWinnerIndex = isDraw ? null : result === "X" ? 0 : 1;
 
-      if (result === "draw") {
+      if (isDraw) {
         await bumpStat(game.guildId, p1, "draws");
         await bumpStat(game.guildId, p2, "draws");
-        await interaction.update({
-          content: `Match nul entre <@${p1}> et <@${p2}> !`,
-          components: buildBoardRows(gameId, game.board, true),
-        });
-        return;
+      } else {
+        const winnerId = game.players[roundWinnerIndex as 0 | 1];
+        const loserId = game.players[roundWinnerIndex === 0 ? 1 : 0];
+        await bumpStat(game.guildId, winnerId, "wins");
+        await bumpStat(game.guildId, loserId, "losses");
       }
 
-      const winnerId = result === "X" ? p1 : p2;
-      const loserId = result === "X" ? p2 : p1;
-      await bumpStat(game.guildId, winnerId, "wins");
-      await bumpStat(game.guildId, loserId, "losses");
+      if (game.matchId) {
+        const outcome = recordRoundResult(game.matchId, roundWinnerIndex);
+        if (outcome) {
+          if (outcome.finished) {
+            const winnerId = outcome.matchWinnerIndex !== null ? game.players[outcome.matchWinnerIndex] : null;
+            await interaction.update({
+              content: `${isDraw ? "Match nul sur cette manche." : `Manche pour <@${game.players[roundWinnerIndex as 0 | 1]}> !`}\n${matchScoreLine(outcome.match)}\n\n🏆 <@${winnerId}> remporte le match !`,
+              components: buildBoardRows(gameId, game.board, true),
+            });
+            return;
+          }
+
+          await interaction.update({
+            content: `${isDraw ? "Match nul sur cette manche." : `Manche pour <@${game.players[roundWinnerIndex as 0 | 1]}> !`}\n${matchScoreLine(outcome.match)}\nProchaine manche dans quelques secondes...`,
+            components: buildBoardRows(gameId, game.board, true),
+          });
+
+          setTimeout(() => {
+            startNextRound(interaction.channel as TextChannel, game.players, game.guildId, game.matchId!).catch(() => null);
+          }, 3_000);
+          return;
+        }
+      }
 
       await interaction.update({
-        content: `Victoire de <@${winnerId}> !`,
+        content: isDraw ? `Match nul entre <@${p1}> et <@${p2}> !` : `Victoire de <@${game.players[roundWinnerIndex as 0 | 1]}> !`,
         components: buildBoardRows(gameId, game.board, true),
       });
       return;

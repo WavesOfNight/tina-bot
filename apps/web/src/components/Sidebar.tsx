@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "slash-commands", label: "Slash Commands", icon: "🔤", section: "modules" },
   { href: "giveaways", label: "Giveaways", icon: "🎉", section: "modules" },
   { href: "reaction-buttons", label: "Reaction Buttons", icon: "🖱️", section: "modules" },
+  { href: "alertes", label: "Alertes", icon: "🔔", section: "modules" },
 ];
 
 const SETTINGS_ITEM: NavItem = { href: "/dashboard/settings", label: "Parametres", icon: "⚙️", section: "global", global: true };

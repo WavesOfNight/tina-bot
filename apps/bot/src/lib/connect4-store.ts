@@ -6,6 +6,7 @@ export interface Connect4Game {
   players: [string, string];
   turn: 0 | 1;
   guildId: string;
+  matchId?: string;
 }
 
 export const connect4Games = new Map<string, Connect4Game>();

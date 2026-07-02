@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getBotConfig, prisma, setBotConfig } from "@tina/database";
+import { getBotConfig, prisma, setBotConfig, setTwitchConfig } from "@tina/database";
 import { auth, type SessionRole } from "@/auth";
 import { checkBotConnection } from "@/lib/discord";
 
@@ -22,6 +22,16 @@ async function saveBotConfig(formData: FormData) {
   revalidatePath("/dashboard/settings");
   revalidatePath("/dashboard");
   revalidatePath("/login");
+}
+
+async function saveTwitchConfig(formData: FormData) {
+  "use server";
+  const twitchClientId = (formData.get("twitchClientId") as string)?.trim();
+  const twitchClientSecret = (formData.get("twitchClientSecret") as string)?.trim();
+  if (!twitchClientId || !twitchClientSecret) return;
+
+  await setTwitchConfig(twitchClientId, twitchClientSecret);
+  revalidatePath("/dashboard/settings");
 }
 
 async function addActivity(formData: FormData) {
@@ -148,6 +158,35 @@ export default async function SettingsPage() {
           </a>
         </div>
       )}
+
+      <h2 className="font-display mb-3 mt-8 flex items-center gap-2 text-lg font-semibold text-lavender-900">
+        <span aria-hidden="true">🟣</span> Alertes Twitch
+      </h2>
+      <p className="mb-3 text-xs text-lavender-500">
+        Necessaire uniquement pour les alertes Twitch (YouTube ne demande rien). Cree une application gratuite sur{" "}
+        <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noreferrer" className="underline">
+          dev.twitch.tv/console/apps
+        </a>{" "}
+        et colle son Client ID et Client Secret ici.
+      </p>
+      <form action={saveTwitchConfig} className="glass-panel mb-4 flex flex-wrap items-end gap-3 rounded-aero p-5 shadow-glass">
+        <div>
+          <label className="mb-1 block text-xs text-lavender-600">Twitch Client ID</label>
+          <input name="twitchClientId" defaultValue={config?.twitchClientId ?? ""} placeholder="abc123..." className="rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-lavender-600">Twitch Client Secret</label>
+          <input
+            name="twitchClientSecret"
+            type="password"
+            placeholder={config?.twitchClientSecret ? "Laisse vide pour garder le secret actuel" : "colle le secret ici"}
+            className="rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+          />
+        </div>
+        <button type="submit" className="bubble-btn rounded-full bg-[#9146FF] px-5 py-2 text-sm font-medium text-white shadow-glass">
+          Enregistrer
+        </button>
+      </form>
 
       <h2 className="font-display mb-3 mt-8 flex items-center gap-2 text-lg font-semibold text-lavender-900">
         <span aria-hidden="true">🎬</span> Activite du bot ({activities.length})

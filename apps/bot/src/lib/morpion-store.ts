@@ -3,6 +3,7 @@ export interface MorpionGame {
   players: [string, string];
   turn: 0 | 1;
   guildId: string;
+  matchId?: string;
 }
 
 export const morpionGames = new Map<string, MorpionGame>();

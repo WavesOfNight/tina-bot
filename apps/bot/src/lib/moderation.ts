@@ -43,3 +43,47 @@ export async function logCase(params: {
 
   return moderationCase;
 }
+
+export async function applyWarnEscalation(guild: Guild, userId: string) {
+  const guildRecord = await prisma.guild.findUnique({ where: { id: guild.id } });
+  if (!guildRecord) return;
+
+  const warnCount = await prisma.moderationCase.count({
+    where: { guildId: guild.id, userId, type: { in: ["WARN", "AUTOMOD"] } },
+  });
+  const moderatorId = guild.client.user.id;
+
+  if (guildRecord.warnBanThreshold && warnCount >= guildRecord.warnBanThreshold) {
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (member?.bannable) {
+      await guild.members.ban(userId, { reason: `Escalade automatique (${warnCount} avertissements)` }).catch(() => null);
+      await logCase({ guild, userId, moderatorId, type: "BAN", reason: `Escalade automatique (${warnCount} avertissements)` });
+    }
+    return;
+  }
+
+  if (guildRecord.warnKickThreshold && warnCount >= guildRecord.warnKickThreshold) {
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (member?.kickable) {
+      await member.kick(`Escalade automatique (${warnCount} avertissements)`).catch(() => null);
+      await logCase({ guild, userId, moderatorId, type: "KICK", reason: `Escalade automatique (${warnCount} avertissements)` });
+    }
+    return;
+  }
+
+  if (guildRecord.warnMuteThreshold && warnCount >= guildRecord.warnMuteThreshold) {
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (member?.moderatable) {
+      const durationMs = 24 * 60 * 60 * 1000;
+      await member.timeout(durationMs, `Escalade automatique (${warnCount} avertissements)`).catch(() => null);
+      await logCase({
+        guild,
+        userId,
+        moderatorId,
+        type: "MUTE",
+        reason: `Escalade automatique (${warnCount} avertissements)`,
+        expiresAt: new Date(Date.now() + durationMs),
+      });
+    }
+  }
+}

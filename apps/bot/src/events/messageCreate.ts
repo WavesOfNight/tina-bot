@@ -4,7 +4,8 @@ import { grantMessageXp } from "../lib/xp.js";
 import { findAutoResponseMatch } from "../lib/auto-response.js";
 import { bombeRounds } from "../lib/bombe-store.js";
 import { findAutoModMatch } from "../lib/automod.js";
-import { logCase } from "../lib/moderation.js";
+import { hasExcessiveCaps, isSpam, matchesInvite, matchesLink } from "../lib/automod-filters.js";
+import { applyWarnEscalation, logCase } from "../lib/moderation.js";
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -15,23 +16,22 @@ export async function execute(message: Message) {
   const channel = message.channel as TextChannel;
   const guildData = await prisma.guild.findUnique({ where: { id: message.guild.id } });
 
-  if (guildData?.autoModLevel && guildData.autoModLevel !== "OFF") {
-    const matchedWord = findAutoModMatch(guildData.autoModLevel, message.content);
-    if (matchedWord && message.deletable) {
-      await message.delete().catch(() => null);
-      await logCase({
-        guild: message.guild,
-        userId: message.author.id,
-        moderatorId: message.client.user.id,
-        type: "AUTOMOD",
-        reason: `Message supprime automatiquement (mot filtre : "${matchedWord}")`,
-      });
-      const notice = await channel
-        .send(`⚠️ ${message.author}, ton message a ete supprime par la moderation automatique.`)
-        .catch(() => null);
-      setTimeout(() => notice?.delete().catch(() => null), 6_000);
-      return;
-    }
+  const violation = detectAutoModViolation(message, guildData);
+  if (violation && message.deletable) {
+    await message.delete().catch(() => null);
+    await logCase({
+      guild: message.guild,
+      userId: message.author.id,
+      moderatorId: message.client.user.id,
+      type: "AUTOMOD",
+      reason: violation,
+    });
+    await applyWarnEscalation(message.guild, message.author.id);
+    const notice = await channel
+      .send(`⚠️ ${message.author}, ton message a ete supprime par la moderation automatique (${violation}).`)
+      .catch(() => null);
+    setTimeout(() => notice?.delete().catch(() => null), 6_000);
+    return;
   }
 
   const bombeRound = bombeRounds.get(message.channelId);
@@ -86,4 +86,30 @@ export async function execute(message: Message) {
   if (autoResponse) {
     await channel.send(autoResponse.response).catch(() => null);
   }
+}
+
+function detectAutoModViolation(
+  message: Message,
+  guildData: {
+    autoModLevel: string;
+    filterInvites: boolean;
+    filterLinks: boolean;
+    filterCaps: boolean;
+    filterSpam: boolean;
+  } | null,
+): string | null {
+  if (!guildData) return null;
+  if (message.member?.permissions.has("ManageMessages")) return null;
+
+  if (guildData.autoModLevel !== "OFF") {
+    const matchedWord = findAutoModMatch(guildData.autoModLevel, message.content);
+    if (matchedWord) return `mot filtre : "${matchedWord}"`;
+  }
+
+  if (guildData.filterLinks && matchesLink(message.content)) return "lien externe non autorise";
+  if (guildData.filterInvites && matchesInvite(message.content)) return "invitation Discord non autorisee";
+  if (guildData.filterCaps && hasExcessiveCaps(message.content)) return "majuscules excessives";
+  if (guildData.filterSpam && isSpam(message.author.id, message.channelId, message.content)) return "spam de messages";
+
+  return null;
 }

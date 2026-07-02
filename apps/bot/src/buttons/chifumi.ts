@@ -1,7 +1,9 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, type TextChannel } from "discord.js";
 import { prisma } from "@tina/database";
 import type { ButtonHandler } from "../types.js";
 import { chifumiDuels, chifumiEmoji, resolveChifumi, type ChifumiChoice } from "../lib/chifumi-store.js";
+import { startChifumiRound } from "../commands/games/chifumi.js";
+import { recordRoundResult, matchScoreLine, matches } from "../lib/match-store.js";
 
 async function bumpStat(guildId: string, userId: string, field: "wins" | "losses" | "draws") {
   await prisma.guild.upsert({ where: { id: guildId }, create: { id: guildId }, update: {} });
@@ -52,30 +54,47 @@ const handler: ButtonHandler = {
 
       chifumiDuels.delete(duelId);
       const result = resolveChifumi(choiceA, choiceB);
+      const isDraw = result === "draw";
+      const roundWinnerIndex = isDraw ? null : result === "a" ? 0 : 1;
 
       const channel = await interaction.client.channels.fetch(duel.channelId).catch(() => null);
       if (!channel || !channel.isTextBased()) return;
       const message = await channel.messages.fetch(duel.messageId).catch(() => null);
-      if (!message) return;
 
       let resultLine: string;
-      if (result === "draw") {
+      if (isDraw) {
         resultLine = "Egalite !";
         await bumpStat(duel.guildId, p1, "draws");
         await bumpStat(duel.guildId, p2, "draws");
       } else {
-        const winnerId = result === "a" ? p1 : p2;
-        const loserId = result === "a" ? p2 : p1;
+        const winnerId = duel.players[roundWinnerIndex as 0 | 1];
+        const loserId = duel.players[roundWinnerIndex === 0 ? 1 : 0];
         resultLine = `<@${winnerId}> gagne !`;
         await bumpStat(duel.guildId, winnerId, "wins");
         await bumpStat(duel.guildId, loserId, "losses");
       }
 
-      await message
-        .edit(
-          `<@${p1}> ${chifumiEmoji(choiceA)} contre ${chifumiEmoji(choiceB)} <@${p2}>\n${resultLine}`,
-        )
-        .catch(() => null);
+      const duelSummary = `<@${p1}> ${chifumiEmoji(choiceA)} contre ${chifumiEmoji(choiceB)} <@${p2}>\n${resultLine}`;
+
+      if (duel.matchId) {
+        const outcome = recordRoundResult(duel.matchId, roundWinnerIndex);
+        if (outcome) {
+          if (outcome.finished) {
+            const winnerId = outcome.matchWinnerIndex !== null ? duel.players[outcome.matchWinnerIndex] : null;
+            await message?.edit(`${duelSummary}\n${matchScoreLine(outcome.match)}\n\n🏆 <@${winnerId}> remporte le match !`).catch(() => null);
+            return;
+          }
+
+          await message?.edit(`${duelSummary}\n${matchScoreLine(outcome.match)}\nProchaine manche dans quelques secondes...`).catch(() => null);
+          const nextRound = matches.get(duel.matchId) ?? outcome.match;
+          setTimeout(() => {
+            startChifumiRound(channel as TextChannel, duel.players, duel.guildId, duel.matchId, ` (manche ${nextRound.round}/${nextRound.roundsToWin * 2 - 1})`).catch(() => null);
+          }, 3_000);
+          return;
+        }
+      }
+
+      await message?.edit(duelSummary).catch(() => null);
     }
   },
 };

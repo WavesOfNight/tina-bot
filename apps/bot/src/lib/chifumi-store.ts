@@ -6,6 +6,7 @@ export interface ChifumiDuel {
   guildId: string;
   channelId: string;
   messageId: string;
+  matchId?: string;
 }
 
 export const chifumiDuels = new Map<string, ChifumiDuel>();
