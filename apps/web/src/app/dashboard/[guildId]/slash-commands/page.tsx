@@ -21,6 +21,7 @@ const CATEGORIES: { label: string; commands: { name: string; description: string
     commands: [
       { name: "hello", description: "Dit bonjour" },
       { name: "hug", description: "Fais un calin a quelqu'un" },
+      { name: "meme", description: "Affiche un meme aleatoire" },
     ],
   },
   {
@@ -72,6 +73,10 @@ const CATEGORIES: { label: string; commands: { name: string; description: string
       { name: "reactionrole", description: "Gere les reaction-roles" },
       { name: "help", description: "Liste toutes les commandes" },
     ],
+  },
+  {
+    label: "Radio",
+    commands: [{ name: "son", description: "Infos sur la radio READS (actuel, historique, auditeurs)" }],
   },
 ];
 
