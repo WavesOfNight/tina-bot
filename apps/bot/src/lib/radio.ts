@@ -103,6 +103,13 @@ async function startSession(client: Client, guildId: string, channelId: string):
     guildId,
     adapterCreator: guild.voiceAdapterCreator,
     selfDeaf: true,
+    debug: true,
+  });
+
+  connection.on("debug", (message) => console.log(`[radio-debug ${guildId}] ${message}`));
+  connection.on("error", (error) => console.error(`[radio-connection-error ${guildId}]`, error));
+  connection.on("stateChange", (oldState, newState) => {
+    console.log(`[radio-state ${guildId}] ${oldState.status} -> ${newState.status}`);
   });
 
   const player = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Play } });
