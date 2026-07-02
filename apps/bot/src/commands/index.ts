@@ -26,6 +26,7 @@ import leaderboard from "./leveling/leaderboard.js";
 import giveaway from "./giveaway/giveaway.js";
 import customcommand from "./customcommand/customcommand.js";
 import reactionrole from "./reactionrole/reactionrole.js";
+import son from "./radio/son.js";
 import help from "./utility/help.js";
 import ping from "./utility/ping.js";
 import userinfo from "./utility/userinfo.js";
@@ -64,6 +65,7 @@ export const commands: Command[] = [
   giveaway,
   customcommand,
   reactionrole,
+  son,
   help,
   ping,
   userinfo,

@@ -28,7 +28,7 @@ async function resolveActivityText(text: string, client: Client<true>): Promise<
     }
 
     const member = members[Math.floor(Math.random() * members.length)];
-    resolved = resolved.replaceAll("{randomMember}", member ? member.user.username : "quelqu'un");
+    resolved = resolved.replaceAll("{randomMember}", member ? member.displayName : "quelqu'un");
   }
 
   if (resolved.includes("{memberCount}")) {

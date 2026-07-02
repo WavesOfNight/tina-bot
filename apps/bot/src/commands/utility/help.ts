@@ -8,7 +8,7 @@ const CATEGORIES = [
   },
   {
     name: "🎉 Fun",
-    value: "`/hello` `/hug`",
+    value: "`/hello` `/hug` `/meme`",
   },
   {
     name: "🎮 Jeux en duel",
@@ -29,6 +29,10 @@ const CATEGORIES = [
   {
     name: "🎁 Serveur",
     value: "`/giveaway` `/reactionrole` `/customcommand`",
+  },
+  {
+    name: "📻 Radio",
+    value: "`/son actuel` `/son historique` `/son auditeurs` — infos en direct sur la radio READS",
   },
 ];
 
