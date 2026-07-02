@@ -1,4 +1,5 @@
 import { prisma } from "@tina/database";
+import { PageHeader } from "@/components/PageHeader";
 
 const GAMES = [
   { key: "MORPION", command: "/morpion", description: "Defie un membre au tic-tac-toe via des boutons.", statLabel: (g: { wins: number; losses: number; draws: number }) => `${g.wins}V / ${g.losses}D / ${g.draws}N` },
@@ -20,9 +21,7 @@ export default async function JeuxPage({ params }: { params: { guildId: string }
 
   return (
     <div>
-      <h1 className="font-display mb-4 flex items-center gap-2 text-xl font-semibold text-lavender-900">
-        <span aria-hidden="true">🎮</span> Jeux
-      </h1>
+      <PageHeader icon="🎮" title="Jeux" subtitle="Toutes les stats des jeux du serveur" />
       <p className="mb-4 text-sm text-lavender-600">
         Jeux au tour par tour, party games et le battle royale <span className="font-medium">/combattre</span> — tous
         fonctionnent des la commande, aucune configuration requise ici, juste les stats.

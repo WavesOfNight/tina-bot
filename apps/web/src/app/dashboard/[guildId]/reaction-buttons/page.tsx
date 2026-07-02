@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels, getGuildRoles } from "@/lib/discord";
+import { PageHeader } from "@/components/PageHeader";
 
 async function createMessage(guildId: string, formData: FormData) {
   "use server";
@@ -41,9 +42,7 @@ export default async function ReactionButtonsPage({ params }: { params: { guildI
 
   return (
     <div>
-      <h1 className="font-display mb-4 flex items-center gap-2 text-xl font-semibold text-lavender-900">
-        <span aria-hidden="true">🖱️</span> Reaction Buttons
-      </h1>
+      <PageHeader icon="🖱️" title="Reaction Buttons" subtitle="Attribue des roles en un clic" />
 
       <form action={create} className="glass-panel mb-4 flex flex-wrap items-end gap-3 rounded-aero p-5 shadow-glass">
         <div className="flex-1">

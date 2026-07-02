@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels } from "@/lib/discord";
+import { PageHeader } from "@/components/PageHeader";
 
 async function saveModConfig(guildId: string, formData: FormData) {
   "use server";
@@ -67,9 +68,7 @@ export default async function ModerationPage({ params }: { params: { guildId: st
 
   return (
     <div>
-      <h1 className="font-display mb-4 flex items-center gap-2 text-xl font-semibold text-lavender-900">
-        <span aria-hidden="true">🛡️</span> Moderation
-      </h1>
+      <PageHeader icon="🛡️" title="Moderation" subtitle="Filtres automatiques, escalade et logs" />
 
       <form action={save} className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
         <label className="mb-1 block text-xs text-lavender-600">Salon de logs de moderation</label>

@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { getBotConfig, prisma } from "@tina/database";
 import { getGuildChannels } from "@/lib/discord";
+import { PageHeader } from "@/components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -54,9 +55,7 @@ export default async function AlertesPage({ params }: { params: { guildId: strin
 
   return (
     <div>
-      <h1 className="font-display mb-4 flex items-center gap-2 text-xl font-semibold text-lavender-900">
-        <span aria-hidden="true">🔔</span> Alertes
-      </h1>
+      <PageHeader icon="🔔" title="Alertes" subtitle="YouTube, Twitch et salon de statistiques" />
 
       <div className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
         <h2 className="mb-2 text-sm font-medium text-lavender-800">Salon vocal statistiques</h2>

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
 import { getGuildChannels, getGuildRoles } from "@/lib/discord";
+import { PageHeader } from "@/components/PageHeader";
 
 const UPLOADS_DIR = join(process.cwd(), "public", "uploads");
 const MAX_BACKGROUND_BYTES = 10 * 1024 * 1024;
@@ -89,9 +90,7 @@ export default async function BienvenuePage({
 
   return (
     <div>
-      <h1 className="font-display mb-4 flex items-center gap-2 text-xl font-semibold text-lavender-900">
-        <span aria-hidden="true">🎁</span> Configuration : Bienvenue
-      </h1>
+      <PageHeader icon="🎁" title="Configuration : Bienvenue" subtitle="Message, image et roles a l'arrivee des membres" />
 
       {searchParams.error && (
         <p className="mb-4 rounded-xl bg-coral-100 px-4 py-2 text-sm text-coral-600">

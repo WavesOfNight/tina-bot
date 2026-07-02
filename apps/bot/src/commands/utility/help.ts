@@ -1,23 +1,50 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
 
+const CATEGORIES = [
+  {
+    name: "🛠️ Utilitaires",
+    value: "`/ping` `/userinfo` `/serverinfo` `/avatar` `/roleinfo` `/poll` `/remindme` `/8ball`",
+  },
+  {
+    name: "🎉 Fun",
+    value: "`/hello` `/hug`",
+  },
+  {
+    name: "🎮 Jeux en duel",
+    value: "`/morpion` `/puissance4` `/chifumi` `/loto` — ajoute `manches:3` ou `manches:5` pour un match !",
+  },
+  {
+    name: "👥 Jeux en groupe",
+    value: "`/trivia` `/bombe` `/histoire` `/combattre`",
+  },
+  {
+    name: "🏆 Niveaux",
+    value: "`/rank` `/leaderboard`",
+  },
+  {
+    name: "🛡️ Moderation",
+    value: "`/warn` `/warnings` `/mute` `/unmute` `/kick` `/ban` `/unban` `/clear` `/slowmode` `/nickname` `/say`",
+  },
+  {
+    name: "🎁 Serveur",
+    value: "`/giveaway` `/reactionrole` `/customcommand`",
+  },
+];
+
 const command: Command = {
   data: new SlashCommandBuilder().setName("help").setDescription("Liste toutes les commandes de Tina [BOT]"),
   async execute(interaction) {
     const embed = new EmbedBuilder()
       .setColor(0x7f77dd)
-      .setTitle("Commandes de Tina [BOT]")
-      .addFields(
-        { name: "Fun", value: "/hello, /hug" },
-        { name: "Jeux (1v1)", value: "/morpion, /puissance4, /chifumi, /loto" },
-        { name: "Jeux (party)", value: "/trivia, /bombe, /histoire, /combattre" },
-        { name: "Niveaux", value: "/rank, /leaderboard" },
-        { name: "Moderation", value: "/ban, /kick, /mute, /warn, /warnings, /clear" },
-        { name: "Giveaways", value: "/giveaway start|end|reroll|list" },
-        { name: "Reaction roles", value: "/reactionrole create|addrole" },
-        { name: "Commandes perso", value: "/customcommand add|remove|list" },
+      .setAuthor({ name: "Tina [BOT]", iconURL: interaction.client.user?.displayAvatarURL() })
+      .setTitle("Toutes les commandes")
+      .setDescription(
+        "Tape `/` dans le chat pour voir la description et les options completes de chaque commande. Tout est aussi configurable depuis le panel web.",
       )
-      .setFooter({ text: "Configure tout depuis le panel web de Tina [BOT]." });
+      .addFields(...CATEGORIES)
+      .setFooter({ text: "Panel web disponible pour tout configurer sans code." })
+      .setTimestamp();
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
   },
