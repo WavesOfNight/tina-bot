@@ -179,6 +179,10 @@ export default async function CommandesPage({ params }: { params: { guildId: str
         {commands.length === 0 && (
           <div className="glass-panel rounded-aero p-4 shadow-glass">
             <p className="text-sm text-lavender-600">Aucune commande personnalisee pour le moment.</p>
+            <p className="mt-1 text-xs text-lavender-500">
+              Cree-en une avec le formulaire ci-dessus (nom + reponse simple). Une fois creee, sa carte apparait ici avec
+              en dessous le constructeur de chaine d&apos;actions (envoyer un message, ajouter un role, attendre, etc.).
+            </p>
           </div>
         )}
         {commands.map((c) => (
