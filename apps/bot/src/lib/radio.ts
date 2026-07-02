@@ -42,7 +42,7 @@ interface RadioSession {
 
 const sessions = new Map<string, RadioSession>();
 
-function createResource() {
+function createResource(guildId: string) {
   const ffmpeg = new FFmpeg({
     args: [
       "-reconnect",
@@ -56,7 +56,7 @@ function createResource() {
       "-analyzeduration",
       "0",
       "-loglevel",
-      "0",
+      "warning",
       "-f",
       "s16le",
       "-ar",
@@ -64,6 +64,9 @@ function createResource() {
       "-ac",
       "2",
     ],
+  });
+  (ffmpeg as any).process?.stderr?.on("data", (chunk: Buffer) => {
+    console.error(`[radio-ffmpeg ${guildId}] ${chunk.toString().trim()}`);
   });
   return createAudioResource(ffmpeg, { inputType: StreamType.Raw });
 }
@@ -75,7 +78,7 @@ function restartWithBackoff(guildId: string, session: RadioSession) {
     session.reconnecting = false;
     if (sessions.get(guildId) !== session) return;
     try {
-      session.player.play(createResource());
+      session.player.play(createResource(guildId));
     } catch (error) {
       console.error(`Echec du redemarrage du flux radio (guilde ${guildId}), la radio sera retentee au prochain cycle`, error);
       stopSession(guildId);
@@ -119,6 +122,7 @@ async function startSession(client: Client, guildId: string, channelId: string):
   sessions.set(guildId, session);
 
   player.on(AudioPlayerStatus.Idle, () => {
+    console.log(`[radio-idle ${guildId}] le flux s'est arrete, nouvelle tentative dans ${RESTART_DELAY_MS}ms`);
     if (sessions.get(guildId) === session) restartWithBackoff(guildId, session);
   });
   player.on("error", (error) => {
@@ -146,7 +150,7 @@ async function startSession(client: Client, guildId: string, channelId: string):
   }
 
   try {
-    player.play(createResource());
+    player.play(createResource(guildId));
   } catch (error) {
     console.error(`Erreur ffmpeg au demarrage de la radio (guilde ${guildId}), nouvelle tentative au prochain cycle`, error);
     stopSession(guildId);
