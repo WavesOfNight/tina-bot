@@ -75,7 +75,7 @@ export async function execute(message: Message) {
       const customCommand = await prisma.customCommand.findUnique({
         where: { guildId_name: { guildId: message.guild.id, name: commandName } },
       });
-      if (customCommand) {
+      if (customCommand && !isBlockedByFilter(customCommand.response, guildData)) {
         await channel.send(customCommand.response).catch(() => null);
         return;
       }
@@ -83,9 +83,17 @@ export async function execute(message: Message) {
   }
 
   const autoResponse = await findAutoResponseMatch(message.guild.id, message.content);
-  if (autoResponse) {
+  if (autoResponse && !isBlockedByFilter(autoResponse.response, guildData)) {
     await channel.send(autoResponse.response).catch(() => null);
   }
+}
+
+function isBlockedByFilter(
+  text: string,
+  guildData: { autoModLevel: string } | null,
+): boolean {
+  if (!guildData || guildData.autoModLevel === "OFF") return false;
+  return findAutoModMatch(guildData.autoModLevel, text) !== null;
 }
 
 function detectAutoModViolation(

@@ -1,6 +1,7 @@
 import type { Command } from "../types.js";
 import hello from "./fun/hello.js";
 import hug from "./fun/hug.js";
+import meme from "./fun/meme.js";
 import morpion from "./games/morpion.js";
 import loto from "./games/loto.js";
 import puissance4 from "./games/puissance4.js";
@@ -38,6 +39,7 @@ import remindme from "./utility/remindme.js";
 export const commands: Command[] = [
   hello,
   hug,
+  meme,
   morpion,
   loto,
   puissance4,

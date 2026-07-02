@@ -1,5 +1,6 @@
-import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
+import { AttachmentBuilder, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
+import { generateHugImage } from "../../lib/hug-image.js";
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -14,11 +15,24 @@ const command: Command = {
       return;
     }
 
+    await interaction.deferReply();
+
     const embed = new EmbedBuilder()
       .setColor(0xd4537e)
       .setDescription(`${interaction.user} envoie un calin tout doux a ${target} !`);
 
-    await interaction.reply({ embeds: [embed] });
+    try {
+      const buffer = await generateHugImage(
+        interaction.user.displayAvatarURL({ extension: "png", size: 256 }),
+        target.displayAvatarURL({ extension: "png", size: 256 }),
+      );
+      const attachment = new AttachmentBuilder(buffer, { name: "calin.png" });
+      embed.setImage("attachment://calin.png");
+      await interaction.editReply({ embeds: [embed], files: [attachment] });
+    } catch (error) {
+      console.error("Echec de la generation de l'image de calin", error);
+      await interaction.editReply({ embeds: [embed] });
+    }
   },
 };
 

@@ -51,6 +51,8 @@ model Guild {
   warnKickThreshold   Int?
   warnBanThreshold    Int?
   statsChannelId      String?
+  radioChannelId      String?
+  radioEnabled        Boolean  @default(false)
   createdAt           DateTime @default(now())
 
   welcomeConfig      WelcomeConfig?
