@@ -1,5 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
+import { findAutoModMatch } from "../../lib/automod.js";
 
 interface MemeApiResponse {
   title: string;
@@ -9,28 +10,46 @@ interface MemeApiResponse {
   author: string;
   ups: number;
   nsfw: boolean;
+  spoiler?: boolean;
+}
+
+// Subreddits reserves quand aucun n'est precise : plus tranquilles que le pool par defaut de l'API.
+const SAFE_SUBREDDITS = ["wholesomememes", "memes", "ProgrammerHumor", "MemeEconomy"];
+const MAX_ATTEMPTS = 5;
+
+function isClean(meme: MemeApiResponse): boolean {
+  if (!meme.url || meme.nsfw || meme.spoiler) return false;
+  return !findAutoModMatch("MEDIUM", `${meme.title} ${meme.subreddit}`);
+}
+
+async function fetchMeme(subreddit: string | null): Promise<MemeApiResponse | null> {
+  const target = subreddit ?? SAFE_SUBREDDITS[Math.floor(Math.random() * SAFE_SUBREDDITS.length)];
+  const res = await fetch(`https://meme-api.com/gimme/${encodeURIComponent(target)}`).catch(() => null);
+  if (!res || !res.ok) return null;
+  return (await res.json().catch(() => null)) as MemeApiResponse | null;
 }
 
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName("meme")
-    .setDescription("Affiche un meme aleatoire")
+    .setDescription("Affiche un meme aleatoire (filtre)")
     .addStringOption((opt) => opt.setName("subreddit").setDescription("Subreddit specifique (optionnel, ex: memes)")),
   async execute(interaction) {
     const subreddit = interaction.options.getString("subreddit");
-    const url = subreddit ? `https://meme-api.com/gimme/${encodeURIComponent(subreddit)}` : "https://meme-api.com/gimme";
 
     await interaction.deferReply();
 
-    const res = await fetch(url).catch(() => null);
-    if (!res || !res.ok) {
-      await interaction.editReply("Impossible de recuperer un meme pour le moment, retente plus tard.");
-      return;
+    let meme: MemeApiResponse | null = null;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const candidate = await fetchMeme(subreddit);
+      if (candidate && isClean(candidate)) {
+        meme = candidate;
+        break;
+      }
     }
 
-    const meme = (await res.json()) as MemeApiResponse;
-    if (!meme.url || meme.nsfw) {
-      await interaction.editReply("Aucun meme adapte trouve, retente !");
+    if (!meme) {
+      await interaction.editReply("Aucun meme adapte trouve pour le moment, retente !");
       return;
     }
 
