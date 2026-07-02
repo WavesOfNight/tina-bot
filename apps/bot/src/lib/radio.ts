@@ -20,6 +20,16 @@ import { prisma } from "@tina/database";
 const ffmpegPath = ffmpegPathImport as unknown as string | null;
 if (ffmpegPath) process.env.FFMPEG_PATH = ffmpegPath;
 
+try {
+  const info = FFmpeg.getInfo();
+  console.log(`FFmpeg detecte pour la radio : ${info.command} (version ${info.version})`);
+} catch (error) {
+  console.error(
+    "FFmpeg introuvable ou non executable : la radio ne pourra pas diffuser de son tant que ce n'est pas corrige.",
+    error,
+  );
+}
+
 const RADIO_URL = "https://radio.reads-records.com/listen/reads_radio/radio.mp3";
 const RESTART_DELAY_MS = 3_000;
 
@@ -58,15 +68,17 @@ function createResource() {
   return createAudioResource(ffmpeg, { inputType: StreamType.Raw });
 }
 
-function restartWithBackoff(session: RadioSession) {
+function restartWithBackoff(guildId: string, session: RadioSession) {
   if (session.reconnecting) return;
   session.reconnecting = true;
   setTimeout(() => {
     session.reconnecting = false;
+    if (sessions.get(guildId) !== session) return;
     try {
       session.player.play(createResource());
     } catch (error) {
-      console.error("Echec du redemarrage du flux radio", error);
+      console.error(`Echec du redemarrage du flux radio (guilde ${guildId}), la radio sera retentee au prochain cycle`, error);
+      stopSession(guildId);
     }
   }, RESTART_DELAY_MS);
 }
@@ -100,11 +112,11 @@ async function startSession(client: Client, guildId: string, channelId: string):
   sessions.set(guildId, session);
 
   player.on(AudioPlayerStatus.Idle, () => {
-    if (sessions.get(guildId) === session) restartWithBackoff(session);
+    if (sessions.get(guildId) === session) restartWithBackoff(guildId, session);
   });
   player.on("error", (error) => {
     console.error(`Erreur du lecteur radio (guilde ${guildId})`, error);
-    if (sessions.get(guildId) === session) restartWithBackoff(session);
+    if (sessions.get(guildId) === session) restartWithBackoff(guildId, session);
   });
 
   connection.on(VoiceConnectionStatus.Disconnected, async () => {
@@ -126,7 +138,12 @@ async function startSession(client: Client, guildId: string, channelId: string):
     return;
   }
 
-  player.play(createResource());
+  try {
+    player.play(createResource());
+  } catch (error) {
+    console.error(`Erreur ffmpeg au demarrage de la radio (guilde ${guildId}), nouvelle tentative au prochain cycle`, error);
+    stopSession(guildId);
+  }
 }
 
 export async function syncRadioPlayback(client: Client) {
