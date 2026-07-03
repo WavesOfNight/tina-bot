@@ -1,5 +1,4 @@
-import { prisma } from "@tina/database";
-import { findAutoModMatch } from "./automod.js";
+import { prisma, findAutoModMatch } from "@tina/database";
 
 export async function findBlacklistedWord(guildId: string, text: string): Promise<string | null> {
   const guildData = await prisma.guild.findUnique({ where: { id: guildId } });

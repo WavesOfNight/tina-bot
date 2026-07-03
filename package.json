@@ -15,6 +15,9 @@
     "bot:start": "npm run start --workspace=@tina/bot",
     "web:dev": "npm run dev --workspace=@tina/web",
     "web:build": "npm run build --workspace=@tina/web",
-    "web:start": "npm run start --workspace=@tina/web"
+    "web:start": "npm run start --workspace=@tina/web",
+    "twitch:dev": "npm run dev --workspace=@tina/twitch-bot",
+    "twitch:build": "npm run build --workspace=@tina/twitch-bot",
+    "twitch:start": "npm run start --workspace=@tina/twitch-bot"
   }
 }

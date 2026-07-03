@@ -37,6 +37,38 @@ model BotConfig {
   updatedAt                   DateTime @updatedAt
 }
 
+model TwitchBotConfig {
+  id                  Int      @id @default(1)
+  username            String?
+  oauthTokenEncrypted String?
+  channelName         String?
+  linkedGuildId       String?
+  autoModLevel        String   @default("OFF")
+  prefix              String   @default("!")
+  enabled             Boolean  @default(false)
+  updatedAt           DateTime @updatedAt
+}
+
+model TwitchCommand {
+  id              Int       @id @default(autoincrement())
+  name            String    @unique
+  response        String
+  cooldownSeconds Int       @default(5)
+  uses            Int       @default(0)
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+model TwitchModerationCase {
+  id        Int      @id @default(autoincrement())
+  username  String
+  type      String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([username])
+}
+
 model Guild {
   id                  String   @id
   name                String?

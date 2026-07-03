@@ -1,0 +1,15 @@
+[Unit]
+Description=Tina [BOT] - Twitch bot
+After=network.target
+
+[Service]
+Type=simple
+User=tina
+WorkingDirectory=/opt/tina-bot/apps/twitch-bot
+EnvironmentFile=/opt/tina-bot/apps/twitch-bot/.env
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

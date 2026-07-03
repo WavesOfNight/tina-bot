@@ -1,9 +1,8 @@
 import { Events, type Message, type TextChannel } from "discord.js";
-import { prisma } from "@tina/database";
+import { prisma, findAutoModMatch } from "@tina/database";
 import { grantMessageXp } from "../lib/xp.js";
 import { findAutoResponseMatch } from "../lib/auto-response.js";
 import { bombeRounds } from "../lib/bombe-store.js";
-import { findAutoModMatch } from "../lib/automod.js";
 import { hasExcessiveCaps, isSpam, matchesInvite, matchesLink } from "../lib/automod-filters.js";
 import { applyWarnEscalation, logCase } from "../lib/moderation.js";
 import { isWordComplete, penduRounds } from "../lib/pendu-store.js";

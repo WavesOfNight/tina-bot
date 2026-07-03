@@ -1,0 +1,22 @@
+{
+  "name": "@tina/twitch-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@tina/database": "*",
+    "dotenv": "^16.4.5",
+    "tmi.js": "^1.8.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@types/tmi.js": "^1.8.6",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}

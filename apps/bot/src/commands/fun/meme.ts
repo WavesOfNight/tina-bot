@@ -1,6 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
-import { findAutoModMatch } from "../../lib/automod.js";
+import { findAutoModMatch } from "@tina/database";
 
 interface MemeApiResponse {
   title: string;

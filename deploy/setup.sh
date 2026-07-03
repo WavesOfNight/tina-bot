@@ -78,8 +78,16 @@ NEXTAUTH_SECRET=$AUTH_SECRET
 EOF
 fi
 
-chown "$APP_USER":"$APP_USER" "$APP_DIR/packages/database/.env" "$APP_DIR/apps/bot/.env" "$APP_DIR/apps/web/.env.local"
-chmod 600 "$APP_DIR/packages/database/.env" "$APP_DIR/apps/bot/.env" "$APP_DIR/apps/web/.env.local"
+if [ ! -f "$APP_DIR/apps/twitch-bot/.env" ]; then
+  echo "==> Writing apps/twitch-bot/.env (reusing the same TOKEN_ENCRYPTION_KEY)"
+  cat > "$APP_DIR/apps/twitch-bot/.env" <<EOF
+DATABASE_URL=file:$DB_PATH
+TOKEN_ENCRYPTION_KEY=$TOKEN_KEY
+EOF
+fi
+
+chown "$APP_USER":"$APP_USER" "$APP_DIR/packages/database/.env" "$APP_DIR/apps/bot/.env" "$APP_DIR/apps/web/.env.local" "$APP_DIR/apps/twitch-bot/.env"
+chmod 600 "$APP_DIR/packages/database/.env" "$APP_DIR/apps/bot/.env" "$APP_DIR/apps/web/.env.local" "$APP_DIR/apps/twitch-bot/.env"
 
 echo "==> Installing dependencies"
 (cd "$APP_DIR" && runuser -u "$APP_USER" -- npm install)
@@ -96,6 +104,9 @@ echo "==> Building the bot"
 echo "==> Building the web dashboard"
 (cd "$APP_DIR" && runuser -u "$APP_USER" -- npm run build --workspace=@tina/web)
 
+echo "==> Building the Twitch bot"
+(cd "$APP_DIR" && runuser -u "$APP_USER" -- npm run build --workspace=@tina/twitch-bot)
+
 echo "==> Configuring Nginx"
 cp "$APP_DIR/deploy/nginx/$DOMAIN.conf" "/etc/nginx/sites-available/$DOMAIN.conf"
 ln -sf "/etc/nginx/sites-available/$DOMAIN.conf" "/etc/nginx/sites-enabled/$DOMAIN.conf"
@@ -105,13 +116,14 @@ systemctl reload nginx
 echo "==> Installing systemd services"
 cp "$APP_DIR/deploy/systemd/tina-bot.service" /etc/systemd/system/tina-bot.service
 cp "$APP_DIR/deploy/systemd/tina-web.service" /etc/systemd/system/tina-web.service
+cp "$APP_DIR/deploy/systemd/tina-twitch.service" /etc/systemd/system/tina-twitch.service
 systemctl daemon-reload
-systemctl enable --now tina-bot tina-web
+systemctl enable --now tina-bot tina-web tina-twitch
 
 echo "==> Requesting HTTPS certificate"
 certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$CERTBOT_EMAIL" --redirect
 
 echo ""
 echo "Done. Visit https://$DOMAIN to finish setup (create your admin account,"
-echo "then paste your bot token in Parametres)."
-echo "Check status with: systemctl status tina-bot tina-web"
+echo "then paste your bot token in Parametres, and your Twitch bot account in Bot Twitch)."
+echo "Check status with: systemctl status tina-bot tina-web tina-twitch"

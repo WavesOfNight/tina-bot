@@ -16,6 +16,7 @@ import {
   Radio,
   Link2,
   Settings,
+  TvMinimalPlay,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,11 +44,12 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const SETTINGS_ITEM: NavItem = { href: "/dashboard/settings", label: "Parametres", icon: Settings, section: "global", global: true };
+const TWITCH_ITEM: NavItem = { href: "/dashboard/twitch", label: "Bot Twitch", icon: TvMinimalPlay, section: "global", global: true };
 
 export function Sidebar({ guildId, showSettings = true }: { guildId: string; showSettings?: boolean }) {
   const pathname = usePathname();
   const base = `/dashboard/${guildId}`;
-  const items = showSettings ? [...NAV_ITEMS, SETTINGS_ITEM] : NAV_ITEMS;
+  const items = showSettings ? [...NAV_ITEMS, TWITCH_ITEM, SETTINGS_ITEM] : NAV_ITEMS;
 
   return (
     <aside className="glass-panel flex w-56 flex-shrink-0 flex-col rounded-aero p-4 shadow-glass">
