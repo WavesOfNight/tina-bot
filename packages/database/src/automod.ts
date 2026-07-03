@@ -1,9 +1,23 @@
 // Severe hate speech / slurs - blocked even at the lowest filter level.
-const LOW_FR = ["sale race", "sale juif", "sale arabe", "nazi de merde", "negro"];
-const LOW_EN = ["nigger", "nigga", "faggot", "retard", "kike", "chink", "spic", "tranny"];
-const LOW_DE = ["neger", "kanake", "schwuchtel"];
-const LOW_ES = ["negrata", "sudaca", "maricon de mierda"];
-const LOW_IT = ["negraccio", "frocio di merda", "terrone"];
+const LOW_FR = [
+  "sale race",
+  "sale juif",
+  "sale juive",
+  "sale arabe",
+  "sale noir",
+  "sale noire",
+  "nazi de merde",
+  "negro",
+  "negresse",
+  "negrillon",
+  "bougnoule",
+  "bounty",
+  "tete de bougnoule",
+];
+const LOW_EN = ["nigger", "nigga", "faggot", "faggy", "retard", "retarded", "kike", "chink", "spic", "tranny", "beaner"];
+const LOW_DE = ["neger", "negerin", "kanake", "kanacke", "schwuchtel"];
+const LOW_ES = ["negrata", "negrata de mierda", "sudaca", "maricon de mierda"];
+const LOW_IT = ["negraccio", "negraccia", "frocio di merda", "terrone"];
 
 const LOW_WORDS = [...LOW_FR, ...LOW_EN, ...LOW_DE, ...LOW_ES, ...LOW_IT];
 
@@ -45,7 +59,11 @@ export function findAutoModMatch(level: string, content: string): string | null 
   const normalized = normalize(content);
   for (const word of words) {
     const normalizedWord = normalize(word);
-    const pattern = new RegExp(`\\b${normalizedWord.replace(/\s+/g, "\\s+")}\\b`, "i");
+    // Trailing "s?" tolerates simple plurals (e.g. "negro" also catches "negros") without
+    // needing a separate list entry for each. Feminine forms are added as distinct words
+    // instead (e.g. "negresse", "conne") since they aren't a simple suffix and a blind "+e"
+    // would false-positive on innocent words like "cone".
+    const pattern = new RegExp(`\\b${normalizedWord.replace(/\s+/g, "\\s+")}s?\\b`, "i");
     if (pattern.test(normalized)) return word;
   }
   return null;
