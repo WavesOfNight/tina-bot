@@ -2,7 +2,7 @@ import "dotenv/config";
 import tmi from "tmi.js";
 import { findAutoModMatch, getTwitchBotConfig } from "@tina/database";
 import { handleTwitchCommand } from "./lib/commands.js";
-import { recordAndLog } from "./lib/moderation.js";
+import { applyAutoModEscalation } from "./lib/escalation.js";
 import { ensureFreshToken } from "./lib/token-refresh.js";
 
 const POLL_INTERVAL_MS = 5_000;
@@ -31,13 +31,14 @@ function createClient(username: string, accessToken: string, channelName: string
     if (!config || !config.enabled) return;
 
     const author = tags["display-name"] || tags.username || "quelqu'un";
+    const loginName = tags.username;
     const isPrivileged = tags.badges?.broadcaster === "1" || Boolean(tags.mod);
 
     if (!isPrivileged && config.autoModLevel !== "OFF") {
       const matched = findAutoModMatch(config.autoModLevel, message);
-      if (matched && tags.id) {
+      if (matched && tags.id && loginName) {
         await client.deletemessage(channel, tags.id).catch(() => null);
-        await recordAndLog(config.linkedGuildId, author, "MESSAGE SUPPRIME", `mot filtre : "${matched}"`);
+        await applyAutoModEscalation(client, channel, loginName, `mot filtre : "${matched}"`, config.linkedGuildId);
         return;
       }
     }
