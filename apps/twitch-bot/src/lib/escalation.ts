@@ -19,20 +19,26 @@ export async function applyAutoModEscalation(
 
   if (violationNumber < 3) {
     await client
-      .say(channel, `@${username} attention, ton message a ete supprime (${reason}). Avertissement ${violationNumber}/3 avant timeout.`)
-      .catch(() => null);
+      .say(channel, `@${username} attention, ton message a ete supprime (langage inapproprie). Avertissement ${violationNumber}/3 avant timeout.`)
+      .catch((error) => console.error("Erreur lors de l'envoi de l'avertissement Twitch", error));
     await recordAndLog(linkedGuildId, username, "AVERTISSEMENT", reason);
     return;
   }
 
   if (violationNumber === 3) {
-    await client.timeout(channel, username, TIMEOUT_SECONDS, reason).catch(() => null);
-    await client.say(channel, `@${username} a ete mis en timeout ${TIMEOUT_SECONDS / 60} minutes (${reason}).`).catch(() => null);
+    await client
+      .timeout(channel, username, TIMEOUT_SECONDS, reason)
+      .catch((error) => console.error(`Erreur lors du timeout Twitch de ${username}`, error));
+    await client
+      .say(channel, `@${username} a ete mis en timeout ${TIMEOUT_SECONDS / 60} minutes (langage inapproprie repete).`)
+      .catch((error) => console.error("Erreur lors de l'envoi du message de timeout Twitch", error));
     await recordAndLog(linkedGuildId, username, "TIMEOUT", reason);
     return;
   }
 
-  await client.ban(channel, username, reason).catch(() => null);
-  await client.say(channel, `@${username} a ete banni (recidive apres timeout : ${reason}).`).catch(() => null);
+  await client.ban(channel, username, reason).catch((error) => console.error(`Erreur lors du ban Twitch de ${username}`, error));
+  await client
+    .say(channel, `@${username} a ete banni (recidive apres timeout).`)
+    .catch((error) => console.error("Erreur lors de l'envoi du message de ban Twitch", error));
   await recordAndLog(linkedGuildId, username, "BAN", reason);
 }

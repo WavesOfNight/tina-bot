@@ -37,7 +37,9 @@ function createClient(username: string, accessToken: string, channelName: string
     if (!isPrivileged && config.autoModLevel !== "OFF") {
       const matched = findAutoModMatch(config.autoModLevel, message);
       if (matched && tags.id && loginName) {
-        await client.deletemessage(channel, tags.id).catch(() => null);
+        await client
+          .deletemessage(channel, tags.id)
+          .catch((error) => console.error(`Echec de la suppression du message Twitch (id=${tags.id}, auteur=${loginName})`, error));
         await applyAutoModEscalation(client, channel, loginName, `mot filtre : "${matched}"`, config.linkedGuildId);
         return;
       }
