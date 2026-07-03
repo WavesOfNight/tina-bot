@@ -38,15 +38,19 @@ model BotConfig {
 }
 
 model TwitchBotConfig {
-  id                  Int      @id @default(1)
-  username            String?
-  oauthTokenEncrypted String?
-  channelName         String?
-  linkedGuildId       String?
-  autoModLevel        String   @default("OFF")
-  prefix              String   @default("!")
-  enabled             Boolean  @default(false)
-  updatedAt           DateTime @updatedAt
+  id                    Int       @id @default(1)
+  username              String?
+  channelName           String?
+  clientId              String?
+  clientSecretEncrypted String?
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  linkedGuildId         String?
+  autoModLevel          String    @default("OFF")
+  prefix                String    @default("!")
+  enabled               Boolean   @default(false)
+  updatedAt             DateTime  @updatedAt
 }
 
 model TwitchCommand {

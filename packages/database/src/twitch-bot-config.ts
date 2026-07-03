@@ -3,8 +3,12 @@ import { decryptSecret, encryptSecret } from "./crypto.js";
 
 export interface ResolvedTwitchBotConfig {
   username: string;
-  oauthToken: string;
   channelName: string;
+  clientId: string | null;
+  clientSecret: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: Date | null;
   linkedGuildId: string | null;
   autoModLevel: string;
   prefix: string;
@@ -14,12 +18,16 @@ export interface ResolvedTwitchBotConfig {
 
 export async function getTwitchBotConfig(): Promise<ResolvedTwitchBotConfig | null> {
   const record = await prisma.twitchBotConfig.findUnique({ where: { id: 1 } });
-  if (!record || !record.username || !record.oauthTokenEncrypted || !record.channelName) return null;
+  if (!record || !record.username || !record.channelName) return null;
 
   return {
     username: record.username,
-    oauthToken: decryptSecret(record.oauthTokenEncrypted),
     channelName: record.channelName,
+    clientId: record.clientId,
+    clientSecret: record.clientSecretEncrypted ? decryptSecret(record.clientSecretEncrypted) : null,
+    accessToken: record.accessTokenEncrypted ? decryptSecret(record.accessTokenEncrypted) : null,
+    refreshToken: record.refreshTokenEncrypted ? decryptSecret(record.refreshTokenEncrypted) : null,
+    tokenExpiresAt: record.tokenExpiresAt,
     linkedGuildId: record.linkedGuildId,
     autoModLevel: record.autoModLevel,
     prefix: record.prefix,
@@ -28,12 +36,38 @@ export async function getTwitchBotConfig(): Promise<ResolvedTwitchBotConfig | nu
   };
 }
 
-export async function setTwitchBotAccount(username: string, oauthToken: string, channelName: string): Promise<void> {
-  const oauthTokenEncrypted = encryptSecret(oauthToken);
+export async function setTwitchBotAccount(username: string, channelName: string): Promise<void> {
   await prisma.twitchBotConfig.upsert({
     where: { id: 1 },
-    create: { id: 1, username, oauthTokenEncrypted, channelName },
-    update: { username, oauthTokenEncrypted, channelName },
+    create: { id: 1, username, channelName },
+    update: { username, channelName },
+  });
+}
+
+export async function getTwitchBotAppCredentials(): Promise<{ clientId: string; clientSecret: string } | null> {
+  const record = await prisma.twitchBotConfig.findUnique({ where: { id: 1 } });
+  if (!record?.clientId || !record.clientSecretEncrypted) return null;
+  return { clientId: record.clientId, clientSecret: decryptSecret(record.clientSecretEncrypted) };
+}
+
+export async function setTwitchBotApp(clientId: string, clientSecret: string): Promise<void> {
+  const clientSecretEncrypted = encryptSecret(clientSecret);
+  await prisma.twitchBotConfig.upsert({
+    where: { id: 1 },
+    create: { id: 1, clientId, clientSecretEncrypted },
+    update: { clientId, clientSecretEncrypted },
+  });
+}
+
+export async function saveTwitchBotOAuthTokens(accessToken: string, refreshToken: string, expiresInSeconds: number): Promise<void> {
+  const accessTokenEncrypted = encryptSecret(accessToken);
+  const refreshTokenEncrypted = encryptSecret(refreshToken);
+  const tokenExpiresAt = new Date(Date.now() + expiresInSeconds * 1000);
+
+  await prisma.twitchBotConfig.upsert({
+    where: { id: 1 },
+    create: { id: 1, accessTokenEncrypted, refreshTokenEncrypted, tokenExpiresAt },
+    update: { accessTokenEncrypted, refreshTokenEncrypted, tokenExpiresAt },
   });
 }
 

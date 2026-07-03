@@ -3,6 +3,7 @@ import tmi from "tmi.js";
 import { findAutoModMatch, getTwitchBotConfig } from "@tina/database";
 import { handleTwitchCommand } from "./lib/commands.js";
 import { recordAndLog } from "./lib/moderation.js";
+import { ensureFreshToken } from "./lib/token-refresh.js";
 
 const POLL_INTERVAL_MS = 5_000;
 const RETRY_COOLDOWN_MS = 30_000;
@@ -17,9 +18,9 @@ function normalizeOauth(token: string): string {
   return trimmed.startsWith("oauth:") ? trimmed : `oauth:${trimmed}`;
 }
 
-function createClient(username: string, oauthToken: string, channelName: string): tmi.Client {
+function createClient(username: string, accessToken: string, channelName: string): tmi.Client {
   const client = new tmi.Client({
-    identity: { username, password: normalizeOauth(oauthToken) },
+    identity: { username, password: normalizeOauth(accessToken) },
     channels: [channelName],
   });
 
@@ -70,14 +71,24 @@ async function supervise() {
     return;
   }
 
-  const signature = `${config.username}:${config.oauthToken}:${config.channelName}`;
+  const accessToken = await ensureFreshToken(config).catch((error) => {
+    console.error("Erreur lors du rafraichissement du token Twitch", error);
+    return config.accessToken;
+  });
+
+  if (!accessToken) {
+    console.log("Aucun token Twitch valide : connecte-toi via le panel web (Bot Twitch).");
+    return;
+  }
+
+  const signature = `${config.username}:${accessToken}:${config.channelName}`;
   if (signature === currentSignature) return;
 
   const now = Date.now();
   if (signature === lastAttemptedSignature && now - lastAttemptAt < RETRY_COOLDOWN_MS) return;
 
   if (currentClient) {
-    console.log("Configuration Twitch mise a jour, reconnexion...");
+    console.log("Configuration ou token Twitch mis a jour, reconnexion...");
     await currentClient.disconnect().catch(() => null);
     currentClient = null;
     currentSignature = null;
@@ -86,14 +97,14 @@ async function supervise() {
   lastAttemptedSignature = signature;
   lastAttemptAt = now;
 
-  const client = createClient(config.username, config.oauthToken, config.channelName);
+  const client = createClient(config.username, accessToken, config.channelName);
   try {
     await client.connect();
     currentClient = client;
     currentSignature = signature;
   } catch (error) {
     console.error(
-      "Connexion Twitch impossible avec les identifiants fournis. Nouvelle tentative dans 30s. Verifie le token OAuth dans le panel web.",
+      "Connexion Twitch impossible avec les identifiants fournis. Nouvelle tentative dans 30s. Verifie la configuration dans le panel web.",
       error,
     );
   }

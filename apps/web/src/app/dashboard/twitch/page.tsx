@@ -1,32 +1,46 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { prisma, getBotConfig, setTwitchBotAccount, setTwitchBotSettings } from "@tina/database";
+import { prisma, getBotConfig, setTwitchBotAccount, setTwitchBotApp, setTwitchBotSettings } from "@tina/database";
 import { auth, type SessionRole } from "@/auth";
 import { getBotGuilds } from "@/lib/discord";
+import { getTwitchRedirectUri } from "@/lib/twitch";
 import { TvMinimalPlay } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
+const TWITCH_SCOPES = "chat:read chat:edit channel:moderate";
+
+const ERROR_MESSAGES: Record<string, string> = {
+  missing_code: "Twitch n'a pas renvoye de code d'autorisation. Reessaie.",
+  missing_app_credentials: "Enregistre d'abord le Client ID et Client Secret ci-dessous avant de te connecter.",
+  token_exchange_failed: "Twitch a refuse l'echange du code (verifie le Client ID/Secret et l'URL de redirection enregistree).",
+};
+
+async function saveApp(formData: FormData) {
+  "use server";
+  const clientId = (formData.get("clientId") as string)?.trim();
+  const clientSecret = (formData.get("clientSecret") as string)?.trim();
+  if (!clientId) return;
+
+  const existing = await prisma.twitchBotConfig.findUnique({ where: { id: 1 } });
+  const secretToUse = clientSecret || null;
+  if (!secretToUse && !existing?.clientSecretEncrypted) return;
+
+  if (secretToUse) {
+    await setTwitchBotApp(clientId, secretToUse);
+  } else {
+    await prisma.twitchBotConfig.upsert({ where: { id: 1 }, create: { id: 1, clientId }, update: { clientId } });
+  }
+  revalidatePath("/dashboard/twitch");
+}
+
 async function saveAccount(formData: FormData) {
   "use server";
   const username = (formData.get("username") as string)?.trim().toLowerCase();
-  const oauthToken = (formData.get("oauthToken") as string)?.trim();
   const channelName = (formData.get("channelName") as string)?.trim().toLowerCase();
   if (!username || !channelName) return;
 
-  const existing = await prisma.twitchBotConfig.findUnique({ where: { id: 1 } });
-  const tokenToUse = oauthToken || null;
-  if (!tokenToUse && !existing?.oauthTokenEncrypted) return;
-
-  if (tokenToUse) {
-    await setTwitchBotAccount(username, tokenToUse, channelName);
-  } else {
-    await prisma.twitchBotConfig.upsert({
-      where: { id: 1 },
-      create: { id: 1, username, channelName },
-      update: { username, channelName },
-    });
-  }
+  await setTwitchBotAccount(username, channelName);
   revalidatePath("/dashboard/twitch");
 }
 
@@ -61,7 +75,7 @@ async function deleteCommand(id: number) {
   revalidatePath("/dashboard/twitch");
 }
 
-export default async function TwitchPage() {
+export default async function TwitchPage({ searchParams }: { searchParams: { twitchConnected?: string; twitchError?: string } }) {
   const session = await auth();
   if (!session) redirect("/login");
   const role = (session as typeof session & { role?: SessionRole }).role ?? "owner";
@@ -75,7 +89,15 @@ export default async function TwitchPage() {
   ]);
 
   const linkedGuild = rawConfig?.linkedGuildId ? await prisma.guild.findUnique({ where: { id: rawConfig.linkedGuildId } }) : null;
-  const hasAccount = Boolean(rawConfig?.username && rawConfig?.oauthTokenEncrypted && rawConfig?.channelName);
+  const hasApp = Boolean(rawConfig?.clientId && rawConfig?.clientSecretEncrypted);
+  const hasAccount = Boolean(rawConfig?.username && rawConfig?.channelName);
+  const isConnected = Boolean(rawConfig?.accessTokenEncrypted && rawConfig?.refreshTokenEncrypted);
+  const redirectUri = getTwitchRedirectUri();
+
+  const authorizeUrl =
+    hasApp && rawConfig?.clientId
+      ? `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${encodeURIComponent(rawConfig.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(TWITCH_SCOPES)}`
+      : null;
 
   return (
     <main className="mx-auto max-w-2xl p-8">
@@ -91,20 +113,70 @@ export default async function TwitchPage() {
         </a>
       </div>
 
+      {searchParams.twitchConnected && (
+        <div className="mb-4 rounded-xl bg-aqua-100 px-4 py-3 text-sm text-aqua-800">Connexion Twitch reussie ! Le token se rafraichit automatiquement.</div>
+      )}
+      {searchParams.twitchError && (
+        <div className="mb-4 rounded-xl bg-coral-100 px-4 py-3 text-sm text-coral-600">
+          {ERROR_MESSAGES[searchParams.twitchError] ?? `Erreur Twitch : ${searchParams.twitchError}`}
+        </div>
+      )}
+
       <div className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
         <div className="mb-3 flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${rawConfig?.enabled && hasAccount ? "bg-aqua-400" : "bg-lavender-200"}`} />
+          <span className={`h-2.5 w-2.5 rounded-full ${rawConfig?.enabled && hasAccount && isConnected ? "bg-aqua-400" : "bg-lavender-200"}`} />
           <p className="text-sm text-lavender-800">
-            {rawConfig?.enabled && hasAccount ? "Activee - se connecte automatiquement" : "Desactivee ou compte incomplet"}
+            {rawConfig?.enabled && hasAccount && isConnected
+              ? "Activee et connectee - le token se rafraichit automatiquement"
+              : isConnected
+                ? "Connectee mais desactivee (coche la case plus bas)"
+                : "Pas encore connectee a Twitch"}
           </p>
         </div>
         <p className="text-xs text-lavender-500">
           Tina rejoint le chat Twitch avec un compte de bot (peut etre ton propre compte ou un compte dedie). Ce compte doit
-          etre modérateur du salon pour pouvoir supprimer des messages et faire des timeouts.
+          etre modérateur du salon pour pouvoir supprimer des messages et faire des timeouts (tape{" "}
+          <code>/mod nomdubot</code> dans ton chat Twitch).
         </p>
       </div>
 
-      <h2 className="mb-3 mt-6 text-sm font-semibold text-lavender-800">Compte Twitch</h2>
+      <h2 className="mb-3 mt-6 text-sm font-semibold text-lavender-800">1. Application Twitch</h2>
+      <p className="mb-3 text-xs text-lavender-500">
+        Cree une application sur{" "}
+        <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noreferrer" className="underline">
+          dev.twitch.tv/console/apps
+        </a>{" "}
+        (categorie &quot;Chat Bot&quot;), puis ajoute cette URL exacte dans ses &quot;OAuth Redirect URLs&quot; :
+      </p>
+      <p className="mb-3 break-all rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 font-mono text-xs text-lavender-800">
+        {redirectUri}
+      </p>
+      <form action={saveApp} className="glass-panel mb-4 space-y-3 rounded-aero p-5 shadow-glass">
+        <div>
+          <label className="mb-1 block text-xs text-lavender-600">Client ID</label>
+          <input
+            name="clientId"
+            required
+            defaultValue={rawConfig?.clientId ?? ""}
+            placeholder="abc123..."
+            className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-lavender-600">Client Secret</label>
+          <input
+            name="clientSecret"
+            type="password"
+            placeholder={hasApp ? "Laisse vide pour garder le secret actuel" : "colle le secret ici"}
+            className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+          />
+        </div>
+        <button type="submit" className="bubble-btn rounded-full bg-[#9146FF] px-5 py-2 text-sm font-medium text-white shadow-glass">
+          Enregistrer l&apos;application
+        </button>
+      </form>
+
+      <h2 className="mb-3 mt-6 text-sm font-semibold text-lavender-800">2. Compte du bot</h2>
       <form action={saveAccount} className="glass-panel mb-4 space-y-3 rounded-aero p-5 shadow-glass">
         <div>
           <label className="mb-1 block text-xs text-lavender-600">Nom d&apos;utilisateur du bot</label>
@@ -126,29 +198,32 @@ export default async function TwitchPage() {
             className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
           />
         </div>
-        <div>
-          <label className="mb-1 block text-xs text-lavender-600">Token OAuth</label>
-          <input
-            name="oauthToken"
-            type="password"
-            placeholder={hasAccount ? "Laisse vide pour garder le token actuel" : "oauth:xxxxxxxxxxxxxxxxxxxxx"}
-            className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
-          />
-          <p className="mt-1 text-xs text-lavender-500">
-            Genere-le gratuitement sur{" "}
-            <a href="https://twitchtokengenerator.com" target="_blank" rel="noreferrer" className="underline">
-              twitchtokengenerator.com
-            </a>{" "}
-            (scopes <code>chat:read</code> et <code>chat:edit</code>) en etant connecte avec le compte du bot. Le token est
-            chiffre avant d&apos;etre stocke.
-          </p>
-        </div>
-        <button type="submit" className="bubble-btn rounded-full bg-[#9146FF] px-5 py-2 text-sm font-medium text-white shadow-glass">
+        <button type="submit" className="bubble-btn rounded-full bg-lavender-400 px-5 py-2 text-sm font-medium text-white shadow-glass">
           Enregistrer le compte
         </button>
       </form>
 
-      <h2 className="mb-3 mt-6 text-sm font-semibold text-lavender-800">Liaison et moderation</h2>
+      <h2 className="mb-3 mt-6 text-sm font-semibold text-lavender-800">3. Connexion</h2>
+      <div className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
+        {isConnected && rawConfig?.tokenExpiresAt && (
+          <p className="mb-3 text-xs text-lavender-500">
+            Token actuel valide jusqu&apos;a {new Date(rawConfig.tokenExpiresAt).toLocaleString("fr-FR")} (renouvele
+            automatiquement avant expiration).
+          </p>
+        )}
+        {authorizeUrl ? (
+          <a
+            href={authorizeUrl}
+            className="bubble-btn inline-block rounded-full bg-[#9146FF] px-5 py-2 text-sm font-medium text-white shadow-glass"
+          >
+            {isConnected ? "Se reconnecter avec Twitch" : "Se connecter avec Twitch"}
+          </a>
+        ) : (
+          <p className="text-sm text-coral-500">Enregistre d&apos;abord le Client ID / Client Secret ci-dessus.</p>
+        )}
+      </div>
+
+      <h2 className="mb-3 mt-6 text-sm font-semibold text-lavender-800">4. Liaison et moderation</h2>
       <form action={saveSettings} className="glass-panel mb-4 space-y-3 rounded-aero p-5 shadow-glass">
         <div>
           <label className="mb-1 block text-xs text-lavender-600">Serveur Discord lie (pour les logs)</label>
