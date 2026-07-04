@@ -8,7 +8,7 @@ import { TvMinimalPlay } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-const TWITCH_SCOPES = "chat:read chat:edit channel:moderate";
+const TWITCH_SCOPES = "chat:read chat:edit channel:moderate moderator:manage:banned_users moderator:manage:chat_messages";
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing_code: "Twitch n'a pas renvoye de code d'autorisation. Reessaie.",
@@ -220,6 +220,12 @@ export default async function TwitchPage({ searchParams }: { searchParams: { twi
           </a>
         ) : (
           <p className="text-sm text-coral-500">Enregistre d&apos;abord le Client ID / Client Secret ci-dessus.</p>
+        )}
+        {isConnected && (
+          <p className="mt-3 text-xs text-coral-500">
+            Si tu t&apos;etais deja connectee avant l&apos;ajout des permissions de moderation (timeout/ban/suppression),
+            reclique sur &quot;Se reconnecter avec Twitch&quot; pour les accorder - l&apos;ancien token ne les a pas.
+          </p>
         )}
       </div>
 
