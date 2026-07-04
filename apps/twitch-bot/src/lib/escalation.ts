@@ -6,6 +6,11 @@ import { banUser, sendWarning, type HelixContext } from "./helix.js";
 
 const TIMEOUT_SECONDS = 600;
 const ESCALATION_TYPES = ["AVERTISSEMENT", "TIMEOUT", "BAN"];
+// Twitch's Helix API runs its own moderation check on the "reason" text and rejects the
+// request (400 "fails moderation standards") if it contains profanity - which the detailed
+// reason often does (e.g. `mot filtre : "pute"`). Helix only ever gets this generic string;
+// the detailed reason is still recorded in our own DB/Discord log via recordAndLog below.
+const API_REASON = "Violation des regles du chat (moderation automatique)";
 
 export async function applyAutoModEscalation(
   client: tmi.Client,
@@ -24,7 +29,7 @@ export async function applyAutoModEscalation(
   const violationNumber = priorViolations + 1;
 
   if (violationNumber < 3) {
-    await sendWarning(ctx, broadcasterId, moderatorId, targetUserId, reason).catch(() => false);
+    await sendWarning(ctx, broadcasterId, moderatorId, targetUserId, API_REASON).catch(() => false);
     await client
       .say(channel, `@${username} attention, ton message a été supprimé (langage inapproprié). Avertissement ${violationNumber}/3 avant timeout.`)
       .catch((error) => console.error("Erreur lors de l'envoi de l'avertissement Twitch", error));
@@ -33,7 +38,7 @@ export async function applyAutoModEscalation(
   }
 
   if (violationNumber === 3) {
-    const ok = await banUser(ctx, broadcasterId, moderatorId, targetUserId, reason, TIMEOUT_SECONDS);
+    const ok = await banUser(ctx, broadcasterId, moderatorId, targetUserId, API_REASON, TIMEOUT_SECONDS);
     if (ok) {
       await client
         .say(channel, `@${username} a été mis en timeout ${TIMEOUT_SECONDS / 60} minutes (langage inapproprié répété).`)
@@ -46,7 +51,7 @@ export async function applyAutoModEscalation(
     return;
   }
 
-  const ok = await banUser(ctx, broadcasterId, moderatorId, targetUserId, reason);
+  const ok = await banUser(ctx, broadcasterId, moderatorId, targetUserId, API_REASON);
   if (ok) {
     await client
       .say(channel, `@${username} a été banni (récidive après timeout).`)
