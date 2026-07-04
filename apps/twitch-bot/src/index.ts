@@ -1,25 +1,43 @@
 import "dotenv/config";
 import tmi from "tmi.js";
-import { findAutoModMatch, getTwitchBotConfig } from "@tina/database";
+import {
+  findAutoModMatch,
+  getTwitchBotConfig,
+  incrementTwitchChatterStat,
+  incrementTwitchDailyStat,
+  getActiveTwitchGiveaway,
+  addTwitchGiveawayEntry,
+  getTwitchGiveawayHistory,
+  getEnabledTwitchTimers,
+  markTwitchTimerSent,
+} from "@tina/database";
 import { handleTwitchCommand } from "./lib/commands.js";
 import { applyAutoModEscalation } from "./lib/escalation.js";
 import { ensureFreshToken } from "./lib/token-refresh.js";
-import { deleteChatMessage, getAuthenticatedUserId, getUserId, type HelixContext } from "./lib/helix.js";
+import { findGranularFilterMatch } from "./lib/filters.js";
+import { deleteChatMessage, getAuthenticatedUserId, getUserId, sendShoutout, type HelixContext } from "./lib/helix.js";
 
 const POLL_INTERVAL_MS = 5_000;
 const RETRY_COOLDOWN_MS = 30_000;
+const TIMER_CHECK_INTERVAL_MS = 30_000;
 
 interface Session {
   client: tmi.Client;
   ctx: HelixContext;
   broadcasterId: string;
   moderatorId: string;
+  channel: string;
 }
 
 let currentSession: Session | null = null;
 let currentSignature: string | null = null;
 let lastAttemptedSignature: string | null = null;
 let lastAttemptAt = 0;
+
+let messageCounter = 0;
+const timerMessageBaseline = new Map<number, number>();
+let announcedActiveGiveawayId: number | null = null;
+let announcedEndedGiveawayId: number | null = null;
 
 function normalizeOauth(token: string): string {
   const trimmed = token.trim();
@@ -46,8 +64,9 @@ async function buildSession(
     identity: { username, password: normalizeOauth(accessToken) },
     channels: [channelName],
   });
+  const channel = `#${channelName}`;
 
-  client.on("message", async (channel, tags, message, self) => {
+  client.on("message", async (channelArg, tags, message, self) => {
     if (self) return;
 
     const config = await getTwitchBotConfig().catch(() => null);
@@ -57,25 +76,65 @@ async function buildSession(
     const loginName = tags.username;
     const isPrivileged = tags.badges?.broadcaster === "1" || Boolean(tags.mod);
 
-    if (!isPrivileged && config.autoModLevel !== "OFF") {
-      const matched = findAutoModMatch(config.autoModLevel, message);
-      if (matched && tags.id && loginName) {
-        const targetUserId = await getUserId(ctx, loginName).catch(() => null);
+    messageCounter++;
+    await incrementTwitchDailyStat("messages").catch(() => null);
+    if (loginName) await incrementTwitchChatterStat(loginName).catch(() => null);
 
+    const activeGiveaway = await getActiveTwitchGiveaway().catch(() => null);
+    if (activeGiveaway && loginName && message.trim().toLowerCase() === activeGiveaway.keyword.toLowerCase()) {
+      await addTwitchGiveawayEntry(activeGiveaway.id, loginName).catch(() => false);
+      return;
+    }
+
+    const shoutoutPrefix = `${config.prefix}so `;
+    if (isPrivileged && message.toLowerCase().startsWith(shoutoutPrefix)) {
+      const target = message.slice(shoutoutPrefix.length).trim().replace(/^@/, "").toLowerCase();
+      if (target) {
+        const targetId = await getUserId(ctx, target).catch(() => null);
+        if (targetId) {
+          const ok = await sendShoutout(ctx, broadcasterId, moderatorId, targetId).catch(() => false);
+          if (ok) {
+            await client.say(channelArg, `Va faire un tour sur la chaine de @${target} ! https://twitch.tv/${target}`).catch(() => null);
+          }
+        }
+      }
+      return;
+    }
+
+    if (!isPrivileged) {
+      let matchedReason: string | null = null;
+      let shouldPunish = true;
+
+      if (config.autoModLevel !== "OFF") {
+        const matchedWord = findAutoModMatch(config.autoModLevel, message);
+        if (matchedWord) matchedReason = `mot filtre : "${matchedWord}"`;
+      }
+      if (!matchedReason) {
+        const granular = findGranularFilterMatch(config, tags, channelArg, message);
+        if (granular) {
+          matchedReason = granular.reason;
+          shouldPunish = granular.punish;
+        }
+      }
+
+      if (matchedReason && tags.id && loginName) {
         await deleteChatMessage(ctx, broadcasterId, moderatorId, tags.id).catch((error) =>
           console.error(`Echec de la suppression du message Twitch (id=${tags.id}, auteur=${loginName})`, error),
         );
 
+        if (!shouldPunish) return;
+
+        const targetUserId = await getUserId(ctx, loginName).catch(() => null);
         if (targetUserId) {
           await applyAutoModEscalation(
             client,
             ctx,
             broadcasterId,
             moderatorId,
-            channel,
+            channelArg,
             loginName,
             targetUserId,
-            `mot filtre : "${matched}"`,
+            matchedReason,
             config.linkedGuildId,
           );
         } else {
@@ -85,7 +144,7 @@ async function buildSession(
       }
     }
 
-    await handleTwitchCommand(client, channel, config.prefix, message, author).catch((error) =>
+    await handleTwitchCommand(client, channelArg, config.prefix, message, author).catch((error) =>
       console.error("Erreur lors du traitement d'une commande Twitch", error),
     );
   });
@@ -93,7 +152,7 @@ async function buildSession(
   client.on("connected", () => console.log(`Tina [BOT] Twitch connectee sur #${channelName}`));
   client.on("disconnected", (reason) => console.log(`Deconnectee de Twitch : ${reason}`));
 
-  return { client, ctx, broadcasterId, moderatorId };
+  return { client, ctx, broadcasterId, moderatorId, channel };
 }
 
 async function supervise() {
@@ -155,7 +214,66 @@ async function supervise() {
   }
 }
 
+async function runTimers() {
+  if (!currentSession) return;
+  const config = await getTwitchBotConfig().catch(() => null);
+  if (!config || !config.enabled) return;
+
+  const timers = await getEnabledTwitchTimers().catch(() => []);
+  const now = Date.now();
+
+  for (const timer of timers) {
+    const last = timer.lastSentAt?.getTime() ?? 0;
+    const elapsedOk = now - last >= timer.intervalMinutes * 60_000;
+    const sentSince = messageCounter - (timerMessageBaseline.get(timer.id) ?? 0);
+    if (!elapsedOk || sentSince < timer.minMessages) continue;
+
+    await currentSession.client.say(currentSession.channel, timer.message).catch((error) =>
+      console.error(`Erreur lors de l'envoi du timer Twitch "${timer.name}"`, error),
+    );
+    timerMessageBaseline.set(timer.id, messageCounter);
+    await markTwitchTimerSent(timer.id).catch(() => null);
+  }
+}
+
+async function checkGiveawayAnnouncements() {
+  if (!currentSession) return;
+
+  const active = await getActiveTwitchGiveaway().catch(() => null);
+  if (active && active.id !== announcedActiveGiveawayId) {
+    announcedActiveGiveawayId = active.id;
+    await currentSession.client
+      .say(currentSession.channel, `🎉 Giveaway lance ! Tape "${active.keyword}" dans le chat pour tenter de gagner : ${active.prize}`)
+      .catch(() => null);
+    return;
+  }
+
+  if (!active) {
+    const [lastEnded] = await getTwitchGiveawayHistory(1).catch(() => []);
+    if (lastEnded && lastEnded.id !== announcedEndedGiveawayId) {
+      announcedEndedGiveawayId = lastEnded.id;
+      if (lastEnded.status === "CANCELLED") {
+        await currentSession.client.say(currentSession.channel, `Le giveaway pour "${lastEnded.prize}" a ete annule.`).catch(() => null);
+      } else if (lastEnded.winnerUsername) {
+        await currentSession.client
+          .say(currentSession.channel, `🎉 Le giveaway est termine ! Felicitations a @${lastEnded.winnerUsername} qui remporte : ${lastEnded.prize}`)
+          .catch(() => null);
+      } else {
+        await currentSession.client
+          .say(currentSession.channel, `Le giveaway pour "${lastEnded.prize}" est termine, mais personne n'a participe.`)
+          .catch(() => null);
+      }
+    }
+  }
+}
+
 supervise();
 setInterval(() => {
   supervise().catch((error) => console.error("Erreur lors de la supervision du bot Twitch", error));
 }, POLL_INTERVAL_MS);
+setInterval(() => {
+  checkGiveawayAnnouncements().catch((error) => console.error("Erreur lors de l'annonce du giveaway Twitch", error));
+}, POLL_INTERVAL_MS);
+setInterval(() => {
+  runTimers().catch((error) => console.error("Erreur lors de l'execution des timers Twitch", error));
+}, TIMER_CHECK_INTERVAL_MS);

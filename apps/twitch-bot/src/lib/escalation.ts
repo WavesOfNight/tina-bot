@@ -1,7 +1,7 @@
 import { prisma } from "@tina/database";
 import type tmi from "tmi.js";
 import { recordAndLog } from "./moderation.js";
-import { banUser, type HelixContext } from "./helix.js";
+import { banUser, sendWarning, type HelixContext } from "./helix.js";
 
 const TIMEOUT_SECONDS = 600;
 const ESCALATION_TYPES = ["AVERTISSEMENT", "TIMEOUT", "BAN"];
@@ -23,6 +23,7 @@ export async function applyAutoModEscalation(
   const violationNumber = priorViolations + 1;
 
   if (violationNumber < 3) {
+    await sendWarning(ctx, broadcasterId, moderatorId, targetUserId, reason).catch(() => false);
     await client
       .say(channel, `@${username} attention, ton message a ete supprime (langage inapproprie). Avertissement ${violationNumber}/3 avant timeout.`)
       .catch((error) => console.error("Erreur lors de l'envoi de l'avertissement Twitch", error));

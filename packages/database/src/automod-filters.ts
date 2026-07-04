@@ -9,11 +9,41 @@ export function matchesLink(content: string): boolean {
   return LINK_REGEX.test(content);
 }
 
+export function matchesUnwhitelistedLink(content: string, whitelist: string[]): boolean {
+  if (!matchesLink(content)) return false;
+  if (whitelist.length === 0) return true;
+  const urls = content.match(/https?:\/\/\S+/gi) ?? [];
+  return urls.some((url) => {
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+      return !whitelist.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+    } catch {
+      return true;
+    }
+  });
+}
+
 export function hasExcessiveCaps(content: string): boolean {
   const letters = content.replace(/[^a-zA-Z]/g, "");
   if (letters.length < 12) return false;
   const upper = letters.replace(/[^A-Z]/g, "");
   return upper.length / letters.length > 0.7;
+}
+
+export function hasExcessiveSymbols(content: string): boolean {
+  const stripped = content.replace(/\s/g, "");
+  if (stripped.length < 8) return false;
+  const symbols = stripped.replace(/[a-zA-Z0-9À-ÿ]/g, "");
+  return symbols.length / stripped.length > 0.5;
+}
+
+export function hasWordRepetition(content: string): boolean {
+  const words = content.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length < 4) return false;
+  const counts = new Map<string, number>();
+  for (const word of words) counts.set(word, (counts.get(word) ?? 0) + 1);
+  const maxCount = Math.max(...counts.values());
+  return maxCount >= 4 && maxCount / words.length > 0.5;
 }
 
 interface SpamEntry {

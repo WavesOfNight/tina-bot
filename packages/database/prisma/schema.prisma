@@ -50,6 +50,16 @@ model TwitchBotConfig {
   autoModLevel          String    @default("OFF")
   prefix                String    @default("!")
   enabled               Boolean   @default(false)
+
+  filterLinksEnabled      Boolean @default(false)
+  linkWhitelist           String  @default("")
+  filterCapsEnabled       Boolean @default(false)
+  filterEmotesEnabled     Boolean @default(false)
+  maxEmotes               Int     @default(5)
+  filterSymbolsEnabled    Boolean @default(false)
+  filterRepetitionEnabled Boolean @default(false)
+  filterSharedChatEnabled Boolean @default(false)
+
   updatedAt             DateTime  @updatedAt
 }
 
@@ -71,6 +81,53 @@ model TwitchModerationCase {
   createdAt DateTime @default(now())
 
   @@index([username])
+}
+
+model TwitchTimer {
+  id              Int       @id @default(autoincrement())
+  name            String
+  message         String
+  intervalMinutes Int       @default(10)
+  minMessages     Int       @default(0)
+  enabled         Boolean   @default(true)
+  lastSentAt      DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+model TwitchGiveaway {
+  id             Int                   @id @default(autoincrement())
+  keyword        String
+  prize          String
+  status         String                @default("ACTIVE")
+  winnerUsername String?
+  createdAt      DateTime              @default(now())
+  endedAt        DateTime?
+  entries        TwitchGiveawayEntry[]
+}
+
+model TwitchGiveawayEntry {
+  id         Int            @id @default(autoincrement())
+  giveaway   TwitchGiveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  giveawayId Int
+  username   String
+  createdAt  DateTime       @default(now())
+
+  @@unique([giveawayId, username])
+}
+
+model TwitchDailyStat {
+  id       Int    @id @default(autoincrement())
+  date     String @unique
+  messages Int    @default(0)
+  commands Int    @default(0)
+  timeouts Int    @default(0)
+}
+
+model TwitchChatterStat {
+  id         Int      @id @default(autoincrement())
+  username   String   @unique
+  messages   Int      @default(0)
+  lastSeenAt DateTime @default(now())
 }
 
 model Guild {

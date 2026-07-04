@@ -1,4 +1,4 @@
-import { prisma } from "@tina/database";
+import { prisma, incrementTwitchDailyStat } from "@tina/database";
 import type tmi from "tmi.js";
 
 export async function handleTwitchCommand(
@@ -23,6 +23,7 @@ export async function handleTwitchCommand(
   const response = command.response.replaceAll("{user}", username).replaceAll("{channel}", channel.replace(/^#/, ""));
   await client.say(channel, response).catch(() => null);
   await prisma.twitchCommand.update({ where: { id: command.id }, data: { uses: { increment: 1 }, lastUsedAt: new Date() } });
+  await incrementTwitchDailyStat("commands").catch(() => null);
 
   return true;
 }

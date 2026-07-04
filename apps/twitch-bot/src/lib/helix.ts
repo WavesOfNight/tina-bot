@@ -69,3 +69,40 @@ export async function banUser(
   }
   return true;
 }
+
+export async function sendWarning(
+  ctx: HelixContext,
+  broadcasterId: string,
+  moderatorId: string,
+  userId: string,
+  reason: string,
+): Promise<boolean> {
+  const res = await helixFetch(ctx, `/moderation/warnings?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: [{ user_id: userId, reason: reason.slice(0, 500) }] }),
+  });
+  if (!res || !res.ok) {
+    console.error(`Echec avertissement officiel Helix (status ${res?.status ?? "?"})`, await res?.text().catch(() => ""));
+    return false;
+  }
+  return true;
+}
+
+export async function sendShoutout(
+  ctx: HelixContext,
+  broadcasterId: string,
+  moderatorId: string,
+  targetBroadcasterId: string,
+): Promise<boolean> {
+  const res = await helixFetch(
+    ctx,
+    `/chat/shoutouts?from_broadcaster_id=${broadcasterId}&to_broadcaster_id=${targetBroadcasterId}&moderator_id=${moderatorId}`,
+    { method: "POST" },
+  );
+  if (!res || !res.ok) {
+    console.error(`Echec shoutout Helix (status ${res?.status ?? "?"})`, await res?.text().catch(() => ""));
+    return false;
+  }
+  return true;
+}

@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
 
   const code = request.nextUrl.searchParams.get("code");
   const error = request.nextUrl.searchParams.get("error");
-  const redirectTarget = new URL("/dashboard/twitch", process.env.NEXTAUTH_URL || request.url);
+  const redirectTarget = new URL("/dashboard/twitch/parametres", process.env.NEXTAUTH_URL || request.url);
 
   if (error) {
     console.error(`[twitch-callback] Twitch a renvoye une erreur : ${error}`);

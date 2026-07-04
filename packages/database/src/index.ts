@@ -4,4 +4,8 @@ export * from "./bot-config.js";
 export * from "./crypto.js";
 export * from "./admin-auth.js";
 export * from "./automod.js";
+export * from "./automod-filters.js";
 export * from "./twitch-bot-config.js";
+export * from "./twitch-timers.js";
+export * from "./twitch-giveaways.js";
+export * from "./twitch-stats.js";

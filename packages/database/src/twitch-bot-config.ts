@@ -13,6 +13,14 @@ export interface ResolvedTwitchBotConfig {
   autoModLevel: string;
   prefix: string;
   enabled: boolean;
+  filterLinksEnabled: boolean;
+  linkWhitelist: string[];
+  filterCapsEnabled: boolean;
+  filterEmotesEnabled: boolean;
+  maxEmotes: number;
+  filterSymbolsEnabled: boolean;
+  filterRepetitionEnabled: boolean;
+  filterSharedChatEnabled: boolean;
   updatedAt: Date;
 }
 
@@ -32,6 +40,16 @@ export async function getTwitchBotConfig(): Promise<ResolvedTwitchBotConfig | nu
     autoModLevel: record.autoModLevel,
     prefix: record.prefix,
     enabled: record.enabled,
+    filterLinksEnabled: record.filterLinksEnabled,
+    linkWhitelist: record.linkWhitelist
+      ? record.linkWhitelist.split(",").map((s) => s.trim()).filter(Boolean)
+      : [],
+    filterCapsEnabled: record.filterCapsEnabled,
+    filterEmotesEnabled: record.filterEmotesEnabled,
+    maxEmotes: record.maxEmotes,
+    filterSymbolsEnabled: record.filterSymbolsEnabled,
+    filterRepetitionEnabled: record.filterRepetitionEnabled,
+    filterSharedChatEnabled: record.filterSharedChatEnabled,
     updatedAt: record.updatedAt,
   };
 }
@@ -76,6 +94,23 @@ export async function setTwitchBotSettings(settings: {
   autoModLevel?: string;
   prefix?: string;
   enabled?: boolean;
+}): Promise<void> {
+  await prisma.twitchBotConfig.upsert({
+    where: { id: 1 },
+    create: { id: 1, ...settings },
+    update: settings,
+  });
+}
+
+export async function setTwitchModeration(settings: {
+  filterLinksEnabled: boolean;
+  linkWhitelist: string;
+  filterCapsEnabled: boolean;
+  filterEmotesEnabled: boolean;
+  maxEmotes: number;
+  filterSymbolsEnabled: boolean;
+  filterRepetitionEnabled: boolean;
+  filterSharedChatEnabled: boolean;
 }): Promise<void> {
   await prisma.twitchBotConfig.upsert({
     where: { id: 1 },
