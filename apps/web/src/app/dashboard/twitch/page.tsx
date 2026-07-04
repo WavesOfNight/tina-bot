@@ -96,7 +96,7 @@ export default async function TwitchPage({ searchParams }: { searchParams: { twi
 
   const authorizeUrl =
     hasApp && rawConfig?.clientId
-      ? `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${encodeURIComponent(rawConfig.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(TWITCH_SCOPES)}`
+      ? `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${encodeURIComponent(rawConfig.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(TWITCH_SCOPES)}&force_verify=true`
       : null;
 
   return (
