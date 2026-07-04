@@ -94,7 +94,7 @@ async function buildSession(
         if (targetId) {
           const ok = await sendShoutout(ctx, broadcasterId, moderatorId, targetId).catch(() => false);
           if (ok) {
-            await client.say(channelArg, `Va faire un tour sur la chaine de @${target} ! https://twitch.tv/${target}`).catch(() => null);
+            await client.say(channelArg, `Va faire un tour sur la chaîne de @${target} ! https://twitch.tv/${target}`).catch(() => null);
           }
         }
       }
@@ -119,7 +119,7 @@ async function buildSession(
 
       if (matchedReason && tags.id && loginName) {
         await deleteChatMessage(ctx, broadcasterId, moderatorId, tags.id).catch((error) =>
-          console.error(`Echec de la suppression du message Twitch (id=${tags.id}, auteur=${loginName})`, error),
+          console.error(`Échec de la suppression du message Twitch (id=${tags.id}, auteur=${loginName})`, error),
         );
 
         if (!shouldPunish) return;
@@ -138,7 +138,7 @@ async function buildSession(
             config.linkedGuildId,
           );
         } else {
-          console.error(`Impossible de resoudre l'ID Twitch de ${loginName}, timeout/ban impossible.`);
+          console.error(`Impossible de résoudre l'ID Twitch de ${loginName}, timeout/ban impossible.`);
         }
         return;
       }
@@ -149,8 +149,8 @@ async function buildSession(
     );
   });
 
-  client.on("connected", () => console.log(`Tina [BOT] Twitch connectee sur #${channelName}`));
-  client.on("disconnected", (reason) => console.log(`Deconnectee de Twitch : ${reason}`));
+  client.on("connected", () => console.log(`Tina [BOT] Twitch connectée sur #${channelName}`));
+  client.on("disconnected", (reason) => console.log(`Déconnectée de Twitch : ${reason}`));
 
   return { client, ctx, broadcasterId, moderatorId, channel };
 }
@@ -243,7 +243,7 @@ async function checkGiveawayAnnouncements() {
   if (active && active.id !== announcedActiveGiveawayId) {
     announcedActiveGiveawayId = active.id;
     await currentSession.client
-      .say(currentSession.channel, `🎉 Giveaway lance ! Tape "${active.keyword}" dans le chat pour tenter de gagner : ${active.prize}`)
+      .say(currentSession.channel, `🎉 Giveaway lancé ! Tape "${active.keyword}" dans le chat pour tenter de gagner : ${active.prize}`)
       .catch(() => null);
     return;
   }
@@ -253,14 +253,14 @@ async function checkGiveawayAnnouncements() {
     if (lastEnded && lastEnded.id !== announcedEndedGiveawayId) {
       announcedEndedGiveawayId = lastEnded.id;
       if (lastEnded.status === "CANCELLED") {
-        await currentSession.client.say(currentSession.channel, `Le giveaway pour "${lastEnded.prize}" a ete annule.`).catch(() => null);
+        await currentSession.client.say(currentSession.channel, `Le giveaway pour "${lastEnded.prize}" a été annulé.`).catch(() => null);
       } else if (lastEnded.winnerUsername) {
         await currentSession.client
-          .say(currentSession.channel, `🎉 Le giveaway est termine ! Felicitations a @${lastEnded.winnerUsername} qui remporte : ${lastEnded.prize}`)
+          .say(currentSession.channel, `🎉 Le giveaway est terminé ! Félicitations à @${lastEnded.winnerUsername} qui remporte : ${lastEnded.prize}`)
           .catch(() => null);
       } else {
         await currentSession.client
-          .say(currentSession.channel, `Le giveaway pour "${lastEnded.prize}" est termine, mais personne n'a participe.`)
+          .say(currentSession.channel, `Le giveaway pour "${lastEnded.prize}" est terminé, mais personne n'a participé.`)
           .catch(() => null);
       }
     }

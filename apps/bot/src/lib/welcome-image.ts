@@ -158,7 +158,7 @@ export async function generateWelcomeImage(
 
   ctx.font = "20px sans-serif";
   ctx.fillStyle = customBackgroundLoaded ? "rgba(255,255,255,0.85)" : "#534AB7";
-  ctx.fillText(`Membre n${member.guild.memberCount}`, WIDTH / 2, textStartY + lines.length * lineHeight + 12);
+  ctx.fillText(`Membre N°${member.guild.memberCount}`, WIDTH / 2, textStartY + lines.length * lineHeight + 12);
 
   return canvas.toBuffer("image/png");
 }
