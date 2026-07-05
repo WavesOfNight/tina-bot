@@ -6,7 +6,7 @@ export interface HelixContext {
 }
 
 async function helixFetch(ctx: HelixContext, path: string, init: RequestInit = {}): Promise<Response | null> {
-  return fetch(`${HELIX_BASE}${path}`, {
+  const res = await fetch(`${HELIX_BASE}${path}`, {
     ...init,
     headers: {
       "Client-Id": ctx.clientId,
@@ -14,6 +14,17 @@ async function helixFetch(ctx: HelixContext, path: string, init: RequestInit = {
       ...(init.headers ?? {}),
     },
   }).catch(() => null);
+
+  if (!res || !res.ok) {
+    const responseBody = await res?.text().catch(() => "");
+    console.error(
+      `Echec requete Helix ${init.method ?? "GET"} ${path} (status ${res?.status ?? "?"})`,
+      `body envoye: ${init.body ?? "(aucun)"}`,
+      `reponse Twitch: ${responseBody}`,
+    );
+  }
+
+  return res;
 }
 
 export async function getAuthenticatedUserId(ctx: HelixContext): Promise<string | null> {
@@ -41,11 +52,7 @@ export async function deleteChatMessage(
     `/moderation/chat?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}&message_id=${messageId}`,
     { method: "DELETE" },
   );
-  if (!res || !res.ok) {
-    console.error(`Echec suppression Helix (status ${res?.status ?? "?"})`, await res?.text().catch(() => ""));
-    return false;
-  }
-  return true;
+  return Boolean(res?.ok);
 }
 
 export async function banUser(
@@ -63,11 +70,7 @@ export async function banUser(
       data: { user_id: userId, reason: reason.slice(0, 500), ...(durationSeconds ? { duration: durationSeconds } : {}) },
     }),
   });
-  if (!res || !res.ok) {
-    console.error(`Echec ban/timeout Helix (status ${res?.status ?? "?"})`, await res?.text().catch(() => ""));
-    return false;
-  }
-  return true;
+  return Boolean(res?.ok);
 }
 
 export async function sendWarning(
@@ -82,11 +85,7 @@ export async function sendWarning(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ data: [{ user_id: userId, reason: reason.slice(0, 500) }] }),
   });
-  if (!res || !res.ok) {
-    console.error(`Echec avertissement officiel Helix (status ${res?.status ?? "?"})`, await res?.text().catch(() => ""));
-    return false;
-  }
-  return true;
+  return Boolean(res?.ok);
 }
 
 export async function sendShoutout(
@@ -100,9 +99,5 @@ export async function sendShoutout(
     `/chat/shoutouts?from_broadcaster_id=${broadcasterId}&to_broadcaster_id=${targetBroadcasterId}&moderator_id=${moderatorId}`,
     { method: "POST" },
   );
-  if (!res || !res.ok) {
-    console.error(`Echec shoutout Helix (status ${res?.status ?? "?"})`, await res?.text().catch(() => ""));
-    return false;
-  }
-  return true;
+  return Boolean(res?.ok);
 }
