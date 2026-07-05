@@ -1,6 +1,7 @@
 import "dotenv/config";
 import tmi from "tmi.js";
 import {
+  prisma,
   findAutoModMatch,
   getTwitchBotConfig,
   grantTwitchMessageXp,
@@ -99,8 +100,20 @@ async function buildSession(
     if (lowerMessage === `${config.prefix}discord`) {
       const inviteUrl = await getDiscordInviteUrl(config.linkedGuildId).catch(() => null);
       await client
-        .say(channelArg, inviteUrl ? `Rejoins le Discord : ${inviteUrl}` : "Aucun lien Discord configure pour le moment.")
+        .say(
+          channelArg,
+          inviteUrl ? `Voici le discord, rejoins-nous petit Liratsien : ${inviteUrl}` : "Aucun lien Discord configure pour le moment.",
+        )
         .catch(() => null);
+      return;
+    }
+
+    if (lowerMessage === `${config.prefix}help`) {
+      const customNames = await prisma.twitchCommand.findMany({ select: { name: true }, orderBy: { name: "asc" } });
+      const builtIns = ["discord", "dleaderboard", "leaderboard", "rank"];
+      const custom = customNames.map((c) => c.name);
+      const all = [...builtIns, ...custom].map((name) => `${config.prefix}${name}`).join(", ");
+      await client.say(channelArg, `📖 Commandes disponibles : ${all}`).catch(() => null);
       return;
     }
 
