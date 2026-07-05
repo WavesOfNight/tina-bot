@@ -76,7 +76,10 @@ export async function execute(message: Message) {
   const prefix = guildData?.prefix ?? "!";
 
   if (message.content.startsWith(prefix)) {
-    const commandName = message.content.slice(prefix.length).trim().split(/\s+/)[0]?.toLowerCase();
+    const rest = message.content.slice(prefix.length).trim();
+    const parts = rest.split(/\s+/);
+    const commandName = parts[0]?.toLowerCase();
+    const args = parts.slice(1);
     if (commandName) {
       const customCommand = await prisma.customCommand.findUnique({
         where: { guildId_name: { guildId: message.guild.id, name: commandName } },
@@ -85,7 +88,7 @@ export async function execute(message: Message) {
       if (customCommand) {
         if (customCommand.actions.length > 0) {
           if (message.member) {
-            await runActionChain(customCommand.actions, { message, member: message.member, guild: message.guild }, (text) =>
+            await runActionChain(customCommand.actions, { message, member: message.member, guild: message.guild, args }, (text) =>
               isBlockedByFilter(text, guildData),
             );
           }

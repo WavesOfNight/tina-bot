@@ -280,15 +280,30 @@ model CustomCommand {
 }
 
 model CustomCommandAction {
-  id              Int           @id @default(autoincrement())
-  customCommand   CustomCommand @relation(fields: [customCommandId], references: [id], onDelete: Cascade)
+  id              Int                    @id @default(autoincrement())
+  customCommand   CustomCommand          @relation(fields: [customCommandId], references: [id], onDelete: Cascade)
   customCommandId Int
+  parent          CustomCommandAction?   @relation("ActionChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId        Int?
+  children        CustomCommandAction[]  @relation("ActionChildren")
+  branch          String?
   order           Int
   type            String
   config          String
-  createdAt       DateTime      @default(now())
+  createdAt       DateTime               @default(now())
 
   @@index([customCommandId])
+  @@index([parentId])
+}
+
+model CustomCommandVariable {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  name      String
+  value     String   @default("")
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, name])
 }
 
 model Giveaway {

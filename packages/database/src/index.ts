@@ -9,3 +9,4 @@ export * from "./twitch-bot-config.js";
 export * from "./twitch-timers.js";
 export * from "./twitch-giveaways.js";
 export * from "./twitch-stats.js";
+export * from "./custom-command-variables.js";
