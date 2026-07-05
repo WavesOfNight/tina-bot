@@ -3,7 +3,9 @@ import tmi from "tmi.js";
 import {
   findAutoModMatch,
   getTwitchBotConfig,
-  incrementTwitchChatterStat,
+  grantTwitchMessageXp,
+  getTwitchLeaderboard,
+  getTwitchRank,
   incrementTwitchDailyStat,
   getActiveTwitchGiveaway,
   addTwitchGiveawayEntry,
@@ -15,6 +17,7 @@ import { handleTwitchCommand } from "./lib/commands.js";
 import { applyAutoModEscalation } from "./lib/escalation.js";
 import { ensureFreshToken } from "./lib/token-refresh.js";
 import { findGranularFilterMatch } from "./lib/filters.js";
+import { getDiscordInviteUrl, getDiscordLeaderboardText } from "./lib/discord-api.js";
 import { deleteChatMessage, getAuthenticatedUserId, getUserId, sendShoutout, type HelixContext } from "./lib/helix.js";
 
 const POLL_INTERVAL_MS = 5_000;
@@ -78,11 +81,56 @@ async function buildSession(
 
     messageCounter++;
     await incrementTwitchDailyStat("messages").catch(() => null);
-    if (loginName) await incrementTwitchChatterStat(loginName).catch(() => null);
+    if (loginName) {
+      const xpResult = await grantTwitchMessageXp(loginName).catch(() => null);
+      if (xpResult?.leveledUp) {
+        await client.say(channelArg, `🎉 GG @${author} ! Tu passes au niveau ${xpResult.newLevel} sur Twitch !`).catch(() => null);
+      }
+    }
 
     const activeGiveaway = await getActiveTwitchGiveaway().catch(() => null);
     if (activeGiveaway && loginName && message.trim().toLowerCase() === activeGiveaway.keyword.toLowerCase()) {
       await addTwitchGiveawayEntry(activeGiveaway.id, loginName).catch(() => false);
+      return;
+    }
+
+    const lowerMessage = message.trim().toLowerCase();
+
+    if (lowerMessage === `${config.prefix}discord`) {
+      const inviteUrl = await getDiscordInviteUrl(config.linkedGuildId).catch(() => null);
+      await client
+        .say(channelArg, inviteUrl ? `Rejoins le Discord : ${inviteUrl}` : "Aucun lien Discord configure pour le moment.")
+        .catch(() => null);
+      return;
+    }
+
+    if (lowerMessage === `${config.prefix}dleaderboard`) {
+      const text = await getDiscordLeaderboardText(config.linkedGuildId).catch(() => null);
+      await client
+        .say(channelArg, text ? `🏆 Top Discord : ${text}` : "Aucun classement Discord disponible pour le moment.")
+        .catch(() => null);
+      return;
+    }
+
+    if (lowerMessage === `${config.prefix}leaderboard`) {
+      const top = await getTwitchLeaderboard(5).catch(() => []);
+      const text = top.length > 0 ? top.map((entry, index) => `${index + 1}. ${entry.username} (Niv. ${entry.level})`).join(" | ") : null;
+      await client
+        .say(channelArg, text ? `🏆 Top Twitch : ${text}` : "Pas encore de classement, discute pour apparaitre dedans !")
+        .catch(() => null);
+      return;
+    }
+
+    if (lowerMessage === `${config.prefix}rank` && loginName) {
+      const rank = await getTwitchRank(loginName).catch(() => null);
+      await client
+        .say(
+          channelArg,
+          rank
+            ? `@${author} tu es niveau ${rank.level} (${rank.xp} XP) - #${rank.rank} du classement Twitch !`
+            : `@${author} discute un peu pour commencer a gagner de l'XP !`,
+        )
+        .catch(() => null);
       return;
     }
 

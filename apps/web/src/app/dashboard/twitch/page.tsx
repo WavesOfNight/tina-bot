@@ -1,4 +1,4 @@
-import { prisma, getTopTwitchChatters, getTopTwitchCommands, getTwitchDailyStats } from "@tina/database";
+import { prisma, getTopTwitchCommands, getTwitchDailyStats, getTwitchLeaderboard } from "@tina/database";
 import { PageHeader } from "@/components/PageHeader";
 import { LayoutDashboard } from "lucide-react";
 
@@ -12,11 +12,11 @@ function todayKey(): string {
 }
 
 export default async function TwitchDashboardPage() {
-  const [config, stats, topCommands, topChatters] = await Promise.all([
+  const [config, stats, topCommands, leaderboard] = await Promise.all([
     prisma.twitchBotConfig.findUnique({ where: { id: 1 } }),
     getTwitchDailyStats(DAYS),
     getTopTwitchCommands(8),
-    getTopTwitchChatters(8),
+    getTwitchLeaderboard(8),
   ]);
 
   const byDate = new Map(stats.map((s) => [s.date, s]));
@@ -88,12 +88,18 @@ export default async function TwitchDashboardPage() {
           ))}
         </div>
         <div className="glass-panel rounded-aero p-2 shadow-glass">
-          <p className="border-b border-lavender-100 px-4 py-2 text-sm font-medium text-lavender-800">Top Chatteurs</p>
-          {topChatters.length === 0 && <p className="p-4 text-sm text-lavender-600">Pas encore de donnees.</p>}
-          {topChatters.map((c) => (
+          <p className="border-b border-lavender-100 px-4 py-2 text-sm font-medium text-lavender-800">
+            Classement Twitch <span className="font-normal text-lavender-400">({config?.prefix ?? "!"}leaderboard)</span>
+          </p>
+          {leaderboard.length === 0 && <p className="p-4 text-sm text-lavender-600">Pas encore de donnees.</p>}
+          {leaderboard.map((c, index) => (
             <div key={c.id} className="flex items-center justify-between border-b border-lavender-100 px-4 py-2 text-sm last:border-none">
-              <span className="text-lavender-900">{c.username}</span>
-              <span className="text-lavender-500">{c.messages}</span>
+              <span className="text-lavender-900">
+                {index + 1}. {c.username}
+              </span>
+              <span className="text-lavender-500">
+                Niv. {c.level} - {c.xp} XP
+              </span>
             </div>
           ))}
         </div>

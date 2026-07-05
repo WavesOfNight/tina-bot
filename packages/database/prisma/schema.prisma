@@ -124,10 +124,13 @@ model TwitchDailyStat {
 }
 
 model TwitchChatterStat {
-  id         Int      @id @default(autoincrement())
-  username   String   @unique
-  messages   Int      @default(0)
-  lastSeenAt DateTime @default(now())
+  id         Int       @id @default(autoincrement())
+  username   String    @unique
+  messages   Int       @default(0)
+  xp         Int       @default(0)
+  level      Int       @default(0)
+  lastXpAt   DateTime?
+  lastSeenAt DateTime  @default(now())
 }
 
 model Guild {
