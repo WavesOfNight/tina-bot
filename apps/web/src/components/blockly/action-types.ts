@@ -7,10 +7,21 @@ export const ACTION_TYPE_TO_BLOCK: Record<string, string> = {
   ADD_REACTION: "tina_add_reaction",
   KICK: "tina_kick",
   BAN: "tina_ban",
+  TIMEOUT: "tina_timeout",
+  DELETE_MESSAGE: "tina_delete_message",
+  STOP: "tina_stop",
   WAIT: "tina_wait",
   SET_VARIABLE: "tina_set_variable",
   IF: "tina_if",
   REPEAT: "tina_repeat",
+  CREATE_CHANNEL: "tina_create_channel",
+  DELETE_CHANNEL: "tina_delete_channel",
+  CREATE_ROLE: "tina_create_role",
+  DELETE_ROLE: "tina_delete_role",
+  MOVE_VOICE: "tina_move_voice",
+  HTTP_REQUEST: "tina_http_request",
+  ADD_CURRENCY: "tina_add_currency",
+  REMOVE_CURRENCY: "tina_remove_currency",
 };
 
 export const BLOCK_TYPE_TO_ACTION: Record<string, string> = Object.fromEntries(

@@ -72,6 +72,34 @@ export async function createPermanentInvite(channelId: string): Promise<{ code: 
   return { code: invite.code };
 }
 
+export async function postTicketPanel(channelId: string): Promise<boolean> {
+  const config = await getBotConfig();
+  if (!config) return false;
+
+  const res = await fetch(`https://discord.com/api/channels/${channelId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bot ${config.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      embeds: [
+        {
+          title: "🎫 Support",
+          description: "Besoin d'aide ou tu veux signaler quelque chose ? Clique sur le bouton ci-dessous pour ouvrir un ticket prive.",
+          color: 0x5865f2,
+        },
+      ],
+      components: [
+        {
+          type: 1,
+          components: [{ type: 2, style: 3, label: "Ouvrir un ticket", custom_id: "ticket:open", emoji: { name: "🎫" } }],
+        },
+      ],
+    }),
+    cache: "no-store",
+  }).catch(() => null);
+
+  return Boolean(res?.ok);
+}
+
 export async function getGuildMemberDisplayNames(guildId: string, userIds: string[]): Promise<Map<string, string>> {
   const config = await getBotConfig();
   const map = new Map<string, string>();

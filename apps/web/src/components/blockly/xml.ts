@@ -39,6 +39,14 @@ function fieldsForNode(type: string, config: Record<string, unknown>): FieldSpec
     case "KICK":
     case "BAN":
       return [{ name: "REASON", value: String(config.reason ?? "") }];
+    case "TIMEOUT":
+      return [
+        { name: "MINUTES", value: String(config.minutes ?? 10) },
+        { name: "REASON", value: String(config.reason ?? "") },
+      ];
+    case "DELETE_MESSAGE":
+    case "STOP":
+      return [];
     case "WAIT":
       return [{ name: "SECONDS", value: String(config.seconds ?? 2) }];
     case "SET_VARIABLE":
@@ -51,6 +59,8 @@ function fieldsForNode(type: string, config: Record<string, unknown>): FieldSpec
       return [
         { name: "CONDITION_TYPE", value: String(config.conditionType ?? "HAS_ROLE") },
         { name: "ROLE_ID", value: String(config.roleId ?? "") },
+        { name: "ROLE_IDS", value: String(config.roleIds ?? "") },
+        { name: "CONDITION_CHANNEL_ID", value: String(config.channelId ?? "") },
         { name: "TEXT", value: String(config.text ?? "") },
         { name: "VARIABLE_NAME", value: String(config.variableName ?? "") },
         { name: "COMPARE_VALUE", value: String(config.compareValue ?? "") },
@@ -58,6 +68,31 @@ function fieldsForNode(type: string, config: Record<string, unknown>): FieldSpec
       ];
     case "REPEAT":
       return [{ name: "COUNT", value: String(config.count ?? 3) }];
+    case "CREATE_CHANNEL":
+      return [
+        { name: "NAME", value: String(config.name ?? "") },
+        { name: "CHANNEL_TYPE", value: String(config.channelType ?? "text") },
+      ];
+    case "DELETE_CHANNEL":
+    case "MOVE_VOICE":
+      return [{ name: "CHANNEL_ID", value: String(config.channelId ?? "") }];
+    case "CREATE_ROLE":
+      return [
+        { name: "NAME", value: String(config.name ?? "") },
+        { name: "COLOR", value: String(config.color ?? "") },
+      ];
+    case "DELETE_ROLE":
+      return [{ name: "ROLE_ID", value: String(config.roleId ?? "") }];
+    case "HTTP_REQUEST":
+      return [
+        { name: "URL", value: String(config.url ?? "") },
+        { name: "METHOD", value: String(config.method ?? "GET") },
+        { name: "JSON_PATH", value: String(config.jsonPath ?? "") },
+        { name: "VARIABLE_NAME", value: String(config.variableName ?? "") },
+      ];
+    case "ADD_CURRENCY":
+    case "REMOVE_CURRENCY":
+      return [{ name: "AMOUNT", value: String(config.amount ?? "10") }];
     default:
       return [];
   }

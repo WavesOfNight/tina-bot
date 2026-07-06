@@ -5,6 +5,7 @@ import {
   findAutoModMatch,
   getTwitchBotConfig,
   grantTwitchMessageXp,
+  grantWatchtimeTick,
   getTwitchLeaderboard,
   getTwitchRank,
   incrementTwitchDailyStat,
@@ -13,17 +14,44 @@ import {
   getTwitchGiveawayHistory,
   getEnabledTwitchTimers,
   markTwitchTimerSent,
+  setTwitchFollowSubTracking,
 } from "@tina/database";
 import { handleTwitchCommand } from "./lib/commands.js";
 import { applyAutoModEscalation } from "./lib/escalation.js";
 import { ensureFreshToken } from "./lib/token-refresh.js";
 import { findGranularFilterMatch } from "./lib/filters.js";
 import { getDiscordInviteUrl, getDiscordLeaderboardText } from "./lib/discord-api.js";
-import { deleteChatMessage, getAuthenticatedUserId, getUserId, sendShoutout, type HelixContext } from "./lib/helix.js";
+import {
+  deleteChatMessage,
+  getAuthenticatedUserId,
+  getChatters,
+  getFollowedAt,
+  getRecentFollowers,
+  getStreamStartedAt,
+  getSubscriberCount,
+  getUserId,
+  sendShoutout,
+  type HelixContext,
+} from "./lib/helix.js";
 
 const POLL_INTERVAL_MS = 5_000;
 const RETRY_COOLDOWN_MS = 30_000;
 const TIMER_CHECK_INTERVAL_MS = 30_000;
+const WATCHTIME_INTERVAL_MS = 5 * 60_000;
+const WATCHTIME_MINUTES_PER_TICK = 5;
+const FOLLOW_SUB_CHECK_INTERVAL_MS = 60_000;
+
+function formatDuration(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60_000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} jour${days > 1 ? "s" : ""}`);
+  if (hours > 0) parts.push(`${hours} heure${hours > 1 ? "s" : ""}`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes} minute${minutes > 1 ? "s" : ""}`);
+  return parts.join(", ");
+}
 
 interface Session {
   client: tmi.Client;
@@ -110,10 +138,37 @@ async function buildSession(
 
     if (lowerMessage === `${config.prefix}help`) {
       const customNames = await prisma.twitchCommand.findMany({ select: { name: true }, orderBy: { name: "asc" } });
-      const builtIns = ["discord", "dleaderboard", "leaderboard", "rank"];
+      const builtIns = ["discord", "dleaderboard", "leaderboard", "rank", "uptime", "followage"];
       const custom = customNames.map((c) => c.name);
       const all = [...builtIns, ...custom].map((name) => `${config.prefix}${name}`).join(", ");
       await client.say(channelArg, `📖 Commandes disponibles : ${all}`).catch(() => null);
+      return;
+    }
+
+    if (lowerMessage === `${config.prefix}uptime`) {
+      const startedAt = await getStreamStartedAt(ctx, broadcasterId).catch(() => null);
+      await client
+        .say(
+          channelArg,
+          startedAt
+            ? `Le stream est en cours depuis ${formatDuration(Date.now() - startedAt.getTime())}.`
+            : "Le stream n'est pas en cours actuellement.",
+        )
+        .catch(() => null);
+      return;
+    }
+
+    if (lowerMessage === `${config.prefix}followage` && loginName) {
+      const targetId = await getUserId(ctx, loginName).catch(() => null);
+      const followedAt = targetId ? await getFollowedAt(ctx, broadcasterId, targetId).catch(() => null) : null;
+      await client
+        .say(
+          channelArg,
+          followedAt
+            ? `@${author} tu suis la chaine depuis ${formatDuration(Date.now() - followedAt.getTime())} !`
+            : `@${author} tu ne suis pas encore la chaine !`,
+        )
+        .catch(() => null);
       return;
     }
 
@@ -208,6 +263,21 @@ async function buildSession(
     await handleTwitchCommand(client, channelArg, config.prefix, message, author).catch((error) =>
       console.error("Erreur lors du traitement d'une commande Twitch", error),
     );
+  });
+
+  client.on("raided", async (_channelArg, username, viewers) => {
+    const freshConfig = await getTwitchBotConfig().catch(() => null);
+    if (!freshConfig?.enabled || !freshConfig.raidShoutoutEnabled) return;
+
+    const targetId = await getUserId(ctx, username).catch(() => null);
+    if (!targetId) return;
+
+    const ok = await sendShoutout(ctx, broadcasterId, moderatorId, targetId).catch(() => false);
+    if (ok) {
+      await client
+        .say(channel, `Merci pour le raid ${username} et ses ${viewers} viewers ! Allez faire un tour sur sa chaine : https://twitch.tv/${username}`)
+        .catch(() => null);
+    }
   });
 
   client.on("connected", () => console.log(`Tina [BOT] Twitch connectée sur #${channelName}`));
@@ -328,6 +398,52 @@ async function checkGiveawayAnnouncements() {
   }
 }
 
+async function runWatchtimeTick() {
+  if (!currentSession) return;
+  const config = await getTwitchBotConfig().catch(() => null);
+  if (!config?.enabled) return;
+
+  const chatters = await getChatters(currentSession.ctx, currentSession.broadcasterId, currentSession.moderatorId).catch(() => []);
+  for (const username of chatters) {
+    await grantWatchtimeTick(username, WATCHTIME_MINUTES_PER_TICK).catch(() => null);
+  }
+}
+
+async function checkFollowSubAnnouncements() {
+  if (!currentSession) return;
+  const config = await getTwitchBotConfig().catch(() => null);
+  if (!config?.enabled) return;
+
+  if (config.announceFollows) {
+    const recent = await getRecentFollowers(currentSession.ctx, currentSession.broadcasterId, 10).catch(() => []);
+    const lastKnown = config.lastKnownFollowAt?.getTime() ?? 0;
+    const newFollowers = recent
+      .filter((f) => f.followedAt.getTime() > lastKnown)
+      .sort((a, b) => a.followedAt.getTime() - b.followedAt.getTime());
+
+    for (const follower of newFollowers) {
+      await currentSession.client.say(currentSession.channel, `🎉 Merci pour ton follow, @${follower.userName} !`).catch(() => null);
+    }
+    if (newFollowers.length > 0) {
+      const latest = newFollowers[newFollowers.length - 1];
+      await setTwitchFollowSubTracking({ lastKnownFollowAt: latest.followedAt }).catch(() => null);
+    }
+  }
+
+  if (config.announceSubs) {
+    const count = await getSubscriberCount(currentSession.ctx, currentSession.broadcasterId).catch(() => null);
+    if (count !== null && config.lastKnownSubCount !== null && count > config.lastKnownSubCount) {
+      const diff = count - config.lastKnownSubCount;
+      await currentSession.client
+        .say(currentSession.channel, diff === 1 ? "🎉 Quelqu'un vient de s'abonner à la chaine !" : `🎉 ${diff} nouveaux abonnés à la chaine !`)
+        .catch(() => null);
+    }
+    if (count !== null && count !== config.lastKnownSubCount) {
+      await setTwitchFollowSubTracking({ lastKnownSubCount: count }).catch(() => null);
+    }
+  }
+}
+
 supervise();
 setInterval(() => {
   supervise().catch((error) => console.error("Erreur lors de la supervision du bot Twitch", error));
@@ -338,3 +454,9 @@ setInterval(() => {
 setInterval(() => {
   runTimers().catch((error) => console.error("Erreur lors de l'execution des timers Twitch", error));
 }, TIMER_CHECK_INTERVAL_MS);
+setInterval(() => {
+  runWatchtimeTick().catch((error) => console.error("Erreur lors du calcul du temps de visionnage Twitch", error));
+}, WATCHTIME_INTERVAL_MS);
+setInterval(() => {
+  checkFollowSubAnnouncements().catch((error) => console.error("Erreur lors de l'annonce follow/sub Twitch", error));
+}, FOLLOW_SUB_CHECK_INTERVAL_MS);

@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { prisma, getBotConfig, setTwitchBotAccount, setTwitchBotApp, setTwitchBotSettings } from "@tina/database";
+import { prisma, getBotConfig, setTwitchBotAccount, setTwitchBotApp, setTwitchBotSettings, setTwitchEngagement } from "@tina/database";
 import { getBotGuilds } from "@/lib/discord";
 import { getTwitchRedirectUri } from "@/lib/twitch";
 import { PageHeader } from "@/components/PageHeader";
@@ -8,7 +8,7 @@ import { Settings } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 const TWITCH_SCOPES =
-  "chat:read chat:edit channel:moderate moderator:manage:banned_users moderator:manage:chat_messages moderator:manage:warnings moderator:manage:shoutouts";
+  "chat:read chat:edit channel:moderate moderator:manage:banned_users moderator:manage:chat_messages moderator:manage:warnings moderator:manage:shoutouts moderator:read:followers moderator:read:chatters channel:read:subscriptions";
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing_code: "Twitch n'a pas renvoye de code d'autorisation. Reessaie.",
@@ -52,6 +52,16 @@ async function saveLiaison(formData: FormData) {
   await setTwitchBotSettings({ linkedGuildId, prefix, enabled });
   revalidatePath("/dashboard/twitch/parametres");
   revalidatePath("/dashboard/twitch");
+}
+
+async function saveEngagement(formData: FormData) {
+  "use server";
+  await setTwitchEngagement({
+    raidShoutoutEnabled: formData.get("raidShoutoutEnabled") === "on",
+    announceFollows: formData.get("announceFollows") === "on",
+    announceSubs: formData.get("announceSubs") === "on",
+  });
+  revalidatePath("/dashboard/twitch/parametres");
 }
 
 export default async function TwitchParametresPage({
@@ -234,6 +244,29 @@ export default async function TwitchParametresPage({
           <input type="checkbox" name="enabled" defaultChecked={rawConfig?.enabled ?? false} className="h-4 w-4 rounded border-lavender-300" />
           Activer le bot Twitch
         </label>
+        <button type="submit" className="bubble-btn rounded-full bg-lavender-400 px-5 py-2 text-sm font-medium text-white shadow-glass">
+          Enregistrer
+        </button>
+      </form>
+
+      <h2 className="mb-3 mt-6 text-sm font-semibold text-lavender-800">5. Engagement</h2>
+      <form action={saveEngagement} className="glass-panel mb-4 space-y-2 rounded-aero p-5 shadow-glass">
+        <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+          <input type="checkbox" name="raidShoutoutEnabled" defaultChecked={rawConfig?.raidShoutoutEnabled ?? true} className="h-4 w-4 rounded border-lavender-300" />
+          Shoutout automatique quand quelqu&apos;un raid la chaine
+        </label>
+        <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+          <input type="checkbox" name="announceFollows" defaultChecked={rawConfig?.announceFollows ?? false} className="h-4 w-4 rounded border-lavender-300" />
+          Annoncer les nouveaux follows dans le chat
+        </label>
+        <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+          <input type="checkbox" name="announceSubs" defaultChecked={rawConfig?.announceSubs ?? false} className="h-4 w-4 rounded border-lavender-300" />
+          Annoncer les nouveaux abonnements dans le chat
+        </label>
+        <p className="pt-1 text-xs text-lavender-500">
+          Les abonnements necessitent que le compte connecte soit le broadcaster lui-meme (Twitch ne permet pas toujours
+          cette lecture a un simple moderateur) - si ca ne fonctionne pas, c&apos;est une limitation cote Twitch, pas un bug.
+        </p>
         <button type="submit" className="bubble-btn rounded-full bg-lavender-400 px-5 py-2 text-sm font-medium text-white shadow-glass">
           Enregistrer
         </button>

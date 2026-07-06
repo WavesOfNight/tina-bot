@@ -35,6 +35,15 @@ function fieldsToConfig(actionType: string, block: Blockly.Block): Record<string
       const reason = block.getFieldValue("REASON");
       return reason ? { reason } : {};
     }
+    case "TIMEOUT": {
+      const config: Record<string, unknown> = { minutes: Math.max(1, Number(block.getFieldValue("MINUTES")) || 10) };
+      const reason = block.getFieldValue("REASON");
+      if (reason) config.reason = reason;
+      return config;
+    }
+    case "DELETE_MESSAGE":
+    case "STOP":
+      return {};
     case "WAIT":
       return { seconds: Math.min(30, Math.max(0, Number(block.getFieldValue("SECONDS")) || 0)) };
     case "SET_VARIABLE":
@@ -48,6 +57,10 @@ function fieldsToConfig(actionType: string, block: Blockly.Block): Record<string
       const config: Record<string, unknown> = { conditionType };
       if (conditionType === "HAS_ROLE") {
         config.roleId = block.getFieldValue("ROLE_ID") || "";
+      } else if (conditionType === "HAS_ANY_ROLE") {
+        config.roleIds = block.getFieldValue("ROLE_IDS") || "";
+      } else if (conditionType === "IN_CHANNEL") {
+        config.channelId = block.getFieldValue("CONDITION_CHANNEL_ID") || "";
       } else if (conditionType === "MESSAGE_CONTAINS") {
         config.text = block.getFieldValue("TEXT") || "";
       } else if (conditionType === "VARIABLE_EQUALS" || conditionType === "VARIABLE_GREATER") {
@@ -60,6 +73,32 @@ function fieldsToConfig(actionType: string, block: Blockly.Block): Record<string
     }
     case "REPEAT":
       return { count: Math.min(20, Math.max(1, Number(block.getFieldValue("COUNT")) || 1)) };
+    case "CREATE_CHANNEL":
+      return {
+        name: block.getFieldValue("NAME") || "",
+        channelType: block.getFieldValue("CHANNEL_TYPE") || "text",
+      };
+    case "DELETE_CHANNEL":
+    case "MOVE_VOICE":
+      return { channelId: block.getFieldValue("CHANNEL_ID") || "" };
+    case "CREATE_ROLE": {
+      const config: Record<string, unknown> = { name: block.getFieldValue("NAME") || "" };
+      const color = block.getFieldValue("COLOR");
+      if (color) config.color = color;
+      return config;
+    }
+    case "DELETE_ROLE":
+      return { roleId: block.getFieldValue("ROLE_ID") || "" };
+    case "HTTP_REQUEST":
+      return {
+        url: block.getFieldValue("URL") || "",
+        method: block.getFieldValue("METHOD") || "GET",
+        jsonPath: block.getFieldValue("JSON_PATH") || "",
+        variableName: block.getFieldValue("VARIABLE_NAME") || "",
+      };
+    case "ADD_CURRENCY":
+    case "REMOVE_CURRENCY":
+      return { amount: block.getFieldValue("AMOUNT") || "10" };
     default:
       return {};
   }

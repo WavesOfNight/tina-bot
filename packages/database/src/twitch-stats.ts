@@ -52,6 +52,20 @@ export async function grantTwitchMessageXp(username: string): Promise<{ leveledU
   return null;
 }
 
+export async function grantWatchtimeTick(username: string, minutes: number): Promise<void> {
+  const stat = await prisma.twitchChatterStat.upsert({
+    where: { username },
+    create: { username, watchMinutes: minutes },
+    update: { watchMinutes: { increment: minutes }, lastSeenAt: new Date() },
+  });
+
+  const gained = minutes * 2;
+  const newXp = stat.xp + gained;
+  const newLevel = Math.min(levelFromXp(newXp), MAX_LEVEL);
+
+  await prisma.twitchChatterStat.update({ where: { username }, data: { xp: newXp, level: newLevel } });
+}
+
 export async function getTopTwitchChatters(limit = 10) {
   return prisma.twitchChatterStat.findMany({ orderBy: { messages: "desc" }, take: limit });
 }

@@ -10,13 +10,14 @@ async function addCommand(guildId: string, formData: FormData) {
   "use server";
   const name = (formData.get("name") as string).toLowerCase().trim().replace(/\s+/g, "-");
   const response = formData.get("response") as string;
+  const cooldownSeconds = Math.max(0, Number(formData.get("cooldownSeconds")) || 0);
   if (!name || !response) return;
 
   await prisma.guild.upsert({ where: { id: guildId }, create: { id: guildId }, update: {} });
   await prisma.customCommand.upsert({
     where: { guildId_name: { guildId, name } },
-    create: { guildId, name, response },
-    update: { response },
+    create: { guildId, name, response, cooldownSeconds },
+    update: { response, cooldownSeconds },
   });
   revalidatePath(`/dashboard/${guildId}/commandes`);
 }
@@ -93,6 +94,10 @@ export default async function CommandesPage({ params }: { params: { guildId: str
           <label className="mb-1 block text-xs text-lavender-600">Reponse simple (utilisee si aucun bloc n&apos;est ajoute)</label>
           <input name="response" required placeholder="Consulte le reglement dans #regles" className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
         </div>
+        <div>
+          <label className="mb-1 block text-xs text-lavender-600">Cooldown (s)</label>
+          <input name="cooldownSeconds" type="number" min={0} defaultValue={0} className="w-20 rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+        </div>
         <button type="submit" className="bubble-btn rounded-full bg-lavender-400 px-5 py-2 text-sm font-medium text-white shadow-glass">
           Ajouter
         </button>
@@ -128,6 +133,7 @@ export default async function CommandesPage({ params }: { params: { guildId: str
                       Chaine de {c.actions.length} bloc{c.actions.length > 1 ? "s" : ""} (la reponse simple est ignoree)
                     </p>
                   )}
+                  {c.cooldownSeconds > 0 && <p className="text-xs text-lavender-400">Cooldown : {c.cooldownSeconds}s</p>}
                 </div>
                 <form action={deleteCommand.bind(null, guildId, c.id)}>
                   <button type="submit" className="rounded-full bg-coral-100 px-3 py-1 text-xs font-medium text-coral-600">

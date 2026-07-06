@@ -1,12 +1,24 @@
-import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, Events, type GuildMember, type TextChannel } from "discord.js";
+import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Events, type GuildMember, type TextChannel } from "discord.js";
 import { prisma } from "@tina/database";
 import { applyPlaceholders } from "../lib/placeholders.js";
 import { generateWelcomeImage } from "../lib/welcome-image.js";
+import { sendLogEmbed } from "../lib/logging.js";
 
 export const name = Events.GuildMemberAdd;
 export const once = false;
 
 export async function execute(member: GuildMember) {
+  const guildRecord = await prisma.guild.findUnique({ where: { id: member.guild.id } });
+  if (guildRecord?.logMemberJoin) {
+    const embed = new EmbedBuilder()
+      .setColor(0x57cc99)
+      .setTitle("Membre arrive")
+      .setThumbnail(member.user.displayAvatarURL())
+      .setDescription(`${member.user.tag} (<@${member.id}>) a rejoint le serveur.`)
+      .setTimestamp();
+    await sendLogEmbed(member.guild, embed);
+  }
+
   const config = await prisma.welcomeConfig.findUnique({ where: { guildId: member.guild.id } });
   if (!config) return;
 

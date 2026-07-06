@@ -86,6 +86,10 @@ export async function execute(message: Message) {
         include: { actions: true },
       });
       if (customCommand) {
+        const now = Date.now();
+        const lastUsed = customCommand.lastUsedAt?.getTime() ?? 0;
+        if (customCommand.cooldownSeconds > 0 && now - lastUsed < customCommand.cooldownSeconds * 1000) return;
+
         if (customCommand.actions.length > 0) {
           if (message.member) {
             await runActionChain(customCommand.actions, { message, member: message.member, guild: message.guild, args }, (text) =>
@@ -95,6 +99,7 @@ export async function execute(message: Message) {
         } else if (!isBlockedByFilter(customCommand.response, guildData)) {
           await channel.send(customCommand.response).catch(() => null);
         }
+        await prisma.customCommand.update({ where: { id: customCommand.id }, data: { lastUsedAt: new Date() } });
         return;
       }
     }

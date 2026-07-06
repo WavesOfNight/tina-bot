@@ -60,6 +60,12 @@ model TwitchBotConfig {
   filterRepetitionEnabled Boolean @default(false)
   filterSharedChatEnabled Boolean @default(false)
 
+  raidShoutoutEnabled Boolean   @default(true)
+  announceFollows     Boolean   @default(false)
+  announceSubs        Boolean   @default(false)
+  lastKnownFollowAt   DateTime?
+  lastKnownSubCount   Int?
+
   updatedAt             DateTime  @updatedAt
 }
 
@@ -124,13 +130,14 @@ model TwitchDailyStat {
 }
 
 model TwitchChatterStat {
-  id         Int       @id @default(autoincrement())
-  username   String    @unique
-  messages   Int       @default(0)
-  xp         Int       @default(0)
-  level      Int       @default(0)
-  lastXpAt   DateTime?
-  lastSeenAt DateTime  @default(now())
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  messages     Int       @default(0)
+  xp           Int       @default(0)
+  level        Int       @default(0)
+  lastXpAt     DateTime?
+  watchMinutes Int       @default(0)
+  lastSeenAt   DateTime  @default(now())
 }
 
 model Guild {
@@ -151,6 +158,21 @@ model Guild {
   radioEnabled        Boolean  @default(false)
   permanentInviteCode      String?
   permanentInviteChannelId String?
+
+  logMessageDelete Boolean @default(false)
+  logMessageEdit   Boolean @default(false)
+  logMemberJoin    Boolean @default(false)
+  logMemberLeave   Boolean @default(false)
+
+  starboardChannelId  String?
+  starboardEmoji      String  @default("⭐")
+  starboardThreshold  Int     @default(3)
+
+  ticketCategoryId     String?
+  ticketSupportRoleId  String?
+  ticketPanelChannelId String?
+  ticketPanelMessageId String?
+
   createdAt           DateTime @default(now())
 
   welcomeConfig      WelcomeConfig?
@@ -165,6 +187,34 @@ model Guild {
   slashCommandToggle SlashCommandToggle[]
   collabStory        CollabStory?
   socialAlerts       SocialAlert[]
+  starboardPosts     StarboardPost[]
+  tickets            Ticket[]
+}
+
+model StarboardPost {
+  id                 Int      @id @default(autoincrement())
+  guild              Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId            String
+  originalMessageId  String   @unique
+  originalChannelId  String
+  starboardMessageId String
+  starCount          Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  @@index([guildId])
+}
+
+model Ticket {
+  id        Int       @id @default(autoincrement())
+  guild     Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId   String
+  channelId String
+  userId    String
+  status    String    @default("OPEN")
+  createdAt DateTime  @default(now())
+  closedAt  DateTime?
+
+  @@index([guildId, status])
 }
 
 model SocialAlert {
@@ -240,6 +290,7 @@ model Member {
   level     Int      @default(0)
   messages  Int      @default(0)
   lastXpAt  DateTime?
+  balance   Int      @default(0)
 
   @@unique([guildId, userId])
   @@index([guildId, xp])
@@ -271,13 +322,15 @@ model ModerationCase {
 }
 
 model CustomCommand {
-  id        Int      @id @default(autoincrement())
-  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
-  guildId   String
-  name      String
-  response  String
-  createdAt DateTime @default(now())
-  actions   CustomCommandAction[]
+  id              Int       @id @default(autoincrement())
+  guild           Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId         String
+  name            String
+  response        String
+  cooldownSeconds Int       @default(0)
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  actions         CustomCommandAction[]
 
   @@unique([guildId, name])
 }

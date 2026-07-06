@@ -1,5 +1,5 @@
-import { EmbedBuilder, type Guild, type GuildMember, type Message } from "discord.js";
-import { getGuildVariables, setGuildVariable } from "@tina/database";
+import { ChannelType, EmbedBuilder, type Guild, type GuildMember, type Message } from "discord.js";
+import { getGuildVariables, setGuildVariable, adjustBalance } from "@tina/database";
 import { applyPlaceholders } from "./placeholders.js";
 
 export interface StoredAction {
@@ -21,6 +21,7 @@ export interface ExecutionContext {
 interface RuntimeContext extends ExecutionContext {
   variables: Record<string, string>;
   budget: { remaining: number };
+  stopped: boolean;
 }
 
 interface ActionNode extends StoredAction {
@@ -31,6 +32,7 @@ const MAX_WAIT_SECONDS = 30;
 const MAX_REPEAT_COUNT = 20;
 const MAX_NESTING_DEPTH = 8;
 const MAX_ACTIONS_PER_RUN = 200;
+const MAX_TIMEOUT_MINUTES = 40_320; // Discord's own cap (28 days)
 
 function buildTree(actions: StoredAction[]): ActionNode[] {
   const nodes = new Map<number, ActionNode>();
@@ -57,7 +59,7 @@ export async function runActionChain(
 ): Promise<void> {
   const tree = buildTree(actions);
   const variables = await getGuildVariables(ctx.guild.id);
-  const runtime: RuntimeContext = { ...ctx, variables, budget: { remaining: MAX_ACTIONS_PER_RUN } };
+  const runtime: RuntimeContext = { ...ctx, variables, budget: { remaining: MAX_ACTIONS_PER_RUN }, stopped: false };
   await executeNodes(tree, runtime, isBlocked, 0);
 }
 
@@ -70,7 +72,7 @@ async function executeNodes(
   if (depth > MAX_NESTING_DEPTH) return;
 
   for (const node of nodes) {
-    if (ctx.budget.remaining <= 0) return;
+    if (ctx.budget.remaining <= 0 || ctx.stopped) return;
     ctx.budget.remaining -= 1;
     try {
       await runSingleAction(node, ctx, isBlocked, depth);
@@ -89,6 +91,14 @@ function evaluateCondition(config: Record<string, unknown>, ctx: RuntimeContext)
     case "HAS_ROLE": {
       const roleId = String(config.roleId ?? "");
       return roleId ? ctx.member.roles.cache.has(roleId) : false;
+    }
+    case "HAS_ANY_ROLE": {
+      const roleIds = String(config.roleIds ?? "").split(",").map((r) => r.trim()).filter(Boolean);
+      return roleIds.some((roleId) => ctx.member.roles.cache.has(roleId));
+    }
+    case "IN_CHANNEL": {
+      const channelId = String(config.channelId ?? "");
+      return channelId ? ctx.message.channelId === channelId : false;
     }
     case "IS_ADMIN":
       return ctx.member.permissions.has("Administrator");
@@ -131,6 +141,14 @@ async function applySetVariable(config: Record<string, unknown>, ctx: RuntimeCon
     case "SUBTRACT":
       next = String((Number(current) || 0) - (Number(rawValue) || 0));
       break;
+    case "MULTIPLY":
+      next = String((Number(current) || 0) * (Number(rawValue) || 0));
+      break;
+    case "DIVIDE": {
+      const divisor = Number(rawValue) || 0;
+      next = divisor === 0 ? current : String((Number(current) || 0) / divisor);
+      break;
+    }
     case "RANDOM": {
       const [minRaw, maxRaw] = rawValue.split(",").map((part) => part.trim());
       const min = Number(minRaw) || 0;
@@ -147,6 +165,39 @@ async function applySetVariable(config: Record<string, unknown>, ctx: RuntimeCon
 
   ctx.variables[name] = next;
   await setGuildVariable(ctx.guild.id, name, next).catch(() => null);
+}
+
+function getJsonPath(data: unknown, path: string): unknown {
+  const parts = path.split(".").map((p) => p.trim()).filter(Boolean);
+  let current: unknown = data;
+  for (const part of parts) {
+    if (current == null) return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}
+
+async function applyHttpRequest(config: Record<string, unknown>, ctx: RuntimeContext): Promise<void> {
+  const url = text(config, "url", ctx);
+  const variableName = String(config.variableName ?? "").trim();
+  if (!url || !variableName || !/^https?:\/\//i.test(url)) return;
+
+  const method = String(config.method ?? "GET").toUpperCase() === "POST" ? "POST" : "GET";
+  const res = await fetch(url, { method }).catch(() => null);
+  if (!res || !res.ok) return;
+
+  const jsonPath = String(config.jsonPath ?? "").trim();
+  let value: unknown;
+  try {
+    const data = await res.json();
+    value = jsonPath ? getJsonPath(data, jsonPath) : data;
+  } catch {
+    value = await res.text().catch(() => "");
+  }
+
+  const stringValue = typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
+  ctx.variables[variableName] = stringValue;
+  await setGuildVariable(ctx.guild.id, variableName, stringValue).catch(() => null);
 }
 
 async function sendToChannel(
@@ -228,6 +279,68 @@ async function runSingleAction(
       await ctx.member.ban({ reason }).catch(() => null);
       break;
     }
+    case "TIMEOUT": {
+      const minutes = Math.min(MAX_TIMEOUT_MINUTES, Math.max(1, Number(config.minutes) || 10));
+      const reason = text(config, "reason", ctx) || "Commande personnalisee";
+      await ctx.member.timeout(minutes * 60_000, reason).catch(() => null);
+      break;
+    }
+    case "DELETE_MESSAGE": {
+      if (ctx.message.deletable) await ctx.message.delete().catch(() => null);
+      break;
+    }
+    case "STOP": {
+      ctx.stopped = true;
+      break;
+    }
+    case "CREATE_CHANNEL": {
+      const name = text(config, "name", ctx).slice(0, 100);
+      if (!name) break;
+      const type = config.channelType === "voice" ? ChannelType.GuildVoice : ChannelType.GuildText;
+      await ctx.guild.channels.create({ name, type }).catch(() => null);
+      break;
+    }
+    case "DELETE_CHANNEL": {
+      const channelId = typeof config.channelId === "string" ? config.channelId : null;
+      if (!channelId) break;
+      const channel = await ctx.guild.channels.fetch(channelId).catch(() => null);
+      await channel?.delete().catch(() => null);
+      break;
+    }
+    case "CREATE_ROLE": {
+      const name = text(config, "name", ctx).slice(0, 100);
+      if (!name) break;
+      const color = typeof config.color === "string" && /^#?[0-9a-fA-F]{6}$/.test(config.color) ? config.color.replace("#", "") : undefined;
+      await ctx.guild.roles.create({ name, color: color ? (parseInt(color, 16) as number) : undefined }).catch(() => null);
+      break;
+    }
+    case "DELETE_ROLE": {
+      const roleId = typeof config.roleId === "string" ? config.roleId : null;
+      if (!roleId) break;
+      const role = await ctx.guild.roles.fetch(roleId).catch(() => null);
+      await role?.delete().catch(() => null);
+      break;
+    }
+    case "MOVE_VOICE": {
+      const channelId = typeof config.channelId === "string" ? config.channelId : null;
+      if (!channelId) break;
+      await ctx.member.voice.setChannel(channelId).catch(() => null);
+      break;
+    }
+    case "HTTP_REQUEST": {
+      await applyHttpRequest(config, ctx);
+      break;
+    }
+    case "ADD_CURRENCY": {
+      const amount = Number(text(config, "amount", ctx)) || 0;
+      if (amount > 0) await adjustBalance(ctx.guild.id, ctx.member.id, amount).catch(() => null);
+      break;
+    }
+    case "REMOVE_CURRENCY": {
+      const amount = Number(text(config, "amount", ctx)) || 0;
+      if (amount > 0) await adjustBalance(ctx.guild.id, ctx.member.id, -amount).catch(() => null);
+      break;
+    }
     case "SET_VARIABLE": {
       await applySetVariable(config, ctx);
       break;
@@ -242,7 +355,7 @@ async function runSingleAction(
       const count = Math.min(MAX_REPEAT_COUNT, Math.max(1, Number(config.count) || 1));
       const body = node.children.filter((child) => child.branch === "BODY");
       for (let i = 0; i < count; i++) {
-        if (ctx.budget.remaining <= 0) return;
+        if (ctx.budget.remaining <= 0 || ctx.stopped) return;
         ctx.variables["_loop_index"] = String(i + 1);
         await executeNodes(body, ctx, isBlocked, depth + 1);
       }

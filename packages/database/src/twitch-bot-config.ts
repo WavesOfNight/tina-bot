@@ -21,6 +21,11 @@ export interface ResolvedTwitchBotConfig {
   filterSymbolsEnabled: boolean;
   filterRepetitionEnabled: boolean;
   filterSharedChatEnabled: boolean;
+  raidShoutoutEnabled: boolean;
+  announceFollows: boolean;
+  announceSubs: boolean;
+  lastKnownFollowAt: Date | null;
+  lastKnownSubCount: number | null;
   updatedAt: Date;
 }
 
@@ -50,6 +55,11 @@ export async function getTwitchBotConfig(): Promise<ResolvedTwitchBotConfig | nu
     filterSymbolsEnabled: record.filterSymbolsEnabled,
     filterRepetitionEnabled: record.filterRepetitionEnabled,
     filterSharedChatEnabled: record.filterSharedChatEnabled,
+    raidShoutoutEnabled: record.raidShoutoutEnabled,
+    announceFollows: record.announceFollows,
+    announceSubs: record.announceSubs,
+    lastKnownFollowAt: record.lastKnownFollowAt,
+    lastKnownSubCount: record.lastKnownSubCount,
     updatedAt: record.updatedAt,
   };
 }
@@ -95,6 +105,26 @@ export async function setTwitchBotSettings(settings: {
   prefix?: string;
   enabled?: boolean;
 }): Promise<void> {
+  await prisma.twitchBotConfig.upsert({
+    where: { id: 1 },
+    create: { id: 1, ...settings },
+    update: settings,
+  });
+}
+
+export async function setTwitchEngagement(settings: {
+  raidShoutoutEnabled: boolean;
+  announceFollows: boolean;
+  announceSubs: boolean;
+}): Promise<void> {
+  await prisma.twitchBotConfig.upsert({
+    where: { id: 1 },
+    create: { id: 1, ...settings },
+    update: settings,
+  });
+}
+
+export async function setTwitchFollowSubTracking(settings: { lastKnownFollowAt?: Date; lastKnownSubCount?: number }): Promise<void> {
   await prisma.twitchBotConfig.upsert({
     where: { id: 1 },
     create: { id: 1, ...settings },

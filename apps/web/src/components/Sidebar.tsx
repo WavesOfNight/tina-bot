@@ -17,6 +17,8 @@ import {
   Link2,
   Settings,
   TvMinimalPlay,
+  Star,
+  Ticket,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,6 +40,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "slash-commands", label: "Slash Commands", icon: SlashSquare, section: "modules" },
   { href: "giveaways", label: "Giveaways", icon: PartyPopper, section: "modules" },
   { href: "reaction-buttons", label: "Reaction Buttons", icon: MousePointerClick, section: "modules" },
+  { href: "starboard", label: "Starboard", icon: Star, section: "modules" },
+  { href: "tickets", label: "Tickets", icon: Ticket, section: "modules" },
   { href: "alertes", label: "Alertes", icon: Bell, section: "modules" },
   { href: "radio", label: "Radio", icon: Radio, section: "modules" },
   { href: "invitation", label: "Invitation", icon: Link2, section: "modules" },

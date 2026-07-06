@@ -12,6 +12,10 @@ async function saveModConfig(guildId: string, formData: FormData) {
   const filterLinks = formData.get("filterLinks") === "on";
   const filterCaps = formData.get("filterCaps") === "on";
   const filterSpam = formData.get("filterSpam") === "on";
+  const logMessageDelete = formData.get("logMessageDelete") === "on";
+  const logMessageEdit = formData.get("logMessageEdit") === "on";
+  const logMemberJoin = formData.get("logMemberJoin") === "on";
+  const logMemberLeave = formData.get("logMemberLeave") === "on";
   const parseThreshold = (name: string) => {
     const raw = (formData.get(name) as string)?.trim();
     return raw ? Number(raw) : null;
@@ -30,6 +34,10 @@ async function saveModConfig(guildId: string, formData: FormData) {
     warnMuteThreshold,
     warnKickThreshold,
     warnBanThreshold,
+    logMessageDelete,
+    logMessageEdit,
+    logMemberJoin,
+    logMemberLeave,
   };
 
   await prisma.guild.upsert({
@@ -115,6 +123,22 @@ export default async function ModerationPage({ params }: { params: { guildId: st
           </label>
           <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
             <input type="checkbox" name="filterSpam" defaultChecked={guild?.filterSpam ?? false} /> Bloquer le spam (messages repetes)
+          </label>
+        </div>
+
+        <h2 className="mb-2 text-sm font-medium text-lavender-800">Logs (dans le salon de logs ci-dessus)</h2>
+        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+            <input type="checkbox" name="logMessageDelete" defaultChecked={guild?.logMessageDelete ?? false} /> Messages supprimes
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+            <input type="checkbox" name="logMessageEdit" defaultChecked={guild?.logMessageEdit ?? false} /> Messages modifies
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+            <input type="checkbox" name="logMemberJoin" defaultChecked={guild?.logMemberJoin ?? false} /> Arrivees de membres
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
+            <input type="checkbox" name="logMemberLeave" defaultChecked={guild?.logMemberLeave ?? false} /> Departs de membres
           </label>
         </div>
 

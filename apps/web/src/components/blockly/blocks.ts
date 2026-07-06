@@ -21,6 +21,8 @@ function roleOptions(): [string, string][] {
 
 const CONDITION_TYPE_OPTIONS: [string, string][] = [
   ["a le role", "HAS_ROLE"],
+  ["a l'un de ces roles", "HAS_ANY_ROLE"],
+  ["est dans le salon", "IN_CHANNEL"],
   ["est administrateur", "IS_ADMIN"],
   ["message contient", "MESSAGE_CONTAINS"],
   ["variable egale", "VARIABLE_EQUALS"],
@@ -32,8 +34,20 @@ const OPERATION_OPTIONS: [string, string][] = [
   ["= (definir)", "SET"],
   ["+= (ajouter)", "ADD"],
   ["-= (soustraire)", "SUBTRACT"],
+  ["*= (multiplier)", "MULTIPLY"],
+  ["/= (diviser)", "DIVIDE"],
   ["= aleatoire (min,max)", "RANDOM"],
   ["+= texte (ajouter a la fin)", "APPEND"],
+];
+
+const CHANNEL_TYPE_OPTIONS: [string, string][] = [
+  ["texte", "text"],
+  ["vocal", "voice"],
+];
+
+const HTTP_METHOD_OPTIONS: [string, string][] = [
+  ["GET", "GET"],
+  ["POST", "POST"],
 ];
 
 const MESSAGE_COLOUR = 210;
@@ -41,6 +55,9 @@ const DISCORD_COLOUR = 135;
 const MODERATION_COLOUR = 0;
 const LOGIC_COLOUR = 290;
 const VARIABLE_COLOUR = 45;
+const SERVER_COLOUR = 20;
+const ECONOMY_COLOUR = 330;
+const ADVANCED_COLOUR = 165;
 
 let registered = false;
 
@@ -110,6 +127,15 @@ export function registerBlocks(): void {
     },
   };
 
+  Blockly.Blocks["tina_delete_message"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Supprimer le message declencheur");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(DISCORD_COLOUR);
+    },
+  };
+
   Blockly.Blocks["tina_kick"] = {
     init(this: Blockly.Block) {
       this.appendDummyInput().appendField("Expulser l'auteur");
@@ -130,6 +156,16 @@ export function registerBlocks(): void {
     },
   };
 
+  Blockly.Blocks["tina_timeout"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Timeout de l'auteur").appendField(new Blockly.FieldNumber(10, 1, 40320), "MINUTES").appendField("min");
+      this.appendDummyInput().appendField("Raison").appendField(new Blockly.FieldTextInput(""), "REASON");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(MODERATION_COLOUR);
+    },
+  };
+
   Blockly.Blocks["tina_wait"] = {
     init(this: Blockly.Block) {
       this.appendDummyInput()
@@ -139,6 +175,15 @@ export function registerBlocks(): void {
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour(LOGIC_COLOUR);
+    },
+  };
+
+  Blockly.Blocks["tina_stop"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Arreter la chaine ici");
+      this.setPreviousStatement(true, null);
+      this.setColour(LOGIC_COLOUR);
+      this.setTooltip("Arrete l'execution de la commande a cet endroit (aucun bloc suivant ne s'execute).");
     },
   };
 
@@ -160,6 +205,8 @@ export function registerBlocks(): void {
     init(this: Blockly.Block) {
       this.appendDummyInput().appendField("SI").appendField(new Blockly.FieldDropdown(CONDITION_TYPE_OPTIONS), "CONDITION_TYPE");
       this.appendDummyInput().appendField("Role (si 'a le role')").appendField(new Blockly.FieldDropdown(roleOptions), "ROLE_ID");
+      this.appendDummyInput().appendField("Roles, separes par des virgules (si 'a l'un de ces roles')").appendField(new Blockly.FieldTextInput(""), "ROLE_IDS");
+      this.appendDummyInput().appendField("Salon (si 'est dans le salon')").appendField(new Blockly.FieldDropdown(channelOptions), "CONDITION_CHANNEL_ID");
       this.appendDummyInput().appendField("Texte (si 'message contient')").appendField(new Blockly.FieldTextInput(""), "TEXT");
       this.appendDummyInput().appendField("Variable (si condition variable)").appendField(new Blockly.FieldTextInput(""), "VARIABLE_NAME");
       this.appendDummyInput().appendField("Valeur de comparaison").appendField(new Blockly.FieldTextInput(""), "COMPARE_VALUE");
@@ -185,6 +232,84 @@ export function registerBlocks(): void {
       this.setTooltip("Max 20 repetitions. {var:_loop_index} donne le numero du tour en cours.");
     },
   };
+
+  Blockly.Blocks["tina_create_channel"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Creer le salon").appendField(new Blockly.FieldTextInput("nouveau-salon"), "NAME");
+      this.appendDummyInput().appendField("Type").appendField(new Blockly.FieldDropdown(CHANNEL_TYPE_OPTIONS), "CHANNEL_TYPE");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(SERVER_COLOUR);
+    },
+  };
+
+  Blockly.Blocks["tina_delete_channel"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Supprimer le salon").appendField(new Blockly.FieldDropdown(channelOptions), "CHANNEL_ID");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(SERVER_COLOUR);
+    },
+  };
+
+  Blockly.Blocks["tina_create_role"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Creer le role").appendField(new Blockly.FieldTextInput("nouveau-role"), "NAME");
+      this.appendDummyInput().appendField("Couleur (optionnel)").appendField(new Blockly.FieldTextInput("#5865F2"), "COLOR");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(SERVER_COLOUR);
+    },
+  };
+
+  Blockly.Blocks["tina_delete_role"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Supprimer le role").appendField(new Blockly.FieldDropdown(roleOptions), "ROLE_ID");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(SERVER_COLOUR);
+    },
+  };
+
+  Blockly.Blocks["tina_move_voice"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Deplacer l'auteur vers").appendField(new Blockly.FieldDropdown(channelOptions), "CHANNEL_ID");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(SERVER_COLOUR);
+      this.setTooltip("Ne fonctionne que si l'auteur est deja connecte a un salon vocal.");
+    },
+  };
+
+  Blockly.Blocks["tina_add_currency"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Donner").appendField(new Blockly.FieldTextInput("10"), "AMOUNT").appendField("pieces a l'auteur");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(ECONOMY_COLOUR);
+    },
+  };
+
+  Blockly.Blocks["tina_remove_currency"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Retirer").appendField(new Blockly.FieldTextInput("10"), "AMOUNT").appendField("pieces a l'auteur");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(ECONOMY_COLOUR);
+    },
+  };
+
+  Blockly.Blocks["tina_http_request"] = {
+    init(this: Blockly.Block) {
+      this.appendDummyInput().appendField("Requete").appendField(new Blockly.FieldDropdown(HTTP_METHOD_OPTIONS), "METHOD").appendField("vers").appendField(new Blockly.FieldTextInput("https://"), "URL");
+      this.appendDummyInput().appendField("Chemin JSON a extraire (optionnel, ex: data.name)").appendField(new Blockly.FieldTextInput(""), "JSON_PATH");
+      this.appendDummyInput().appendField("Stocker dans la variable").appendField(new Blockly.FieldTextInput("resultat"), "VARIABLE_NAME");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(ADVANCED_COLOUR);
+      this.setTooltip("Appelle une API externe et stocke le resultat dans une variable ({var:nom}).");
+    },
+  };
 }
 
 export const TOOLBOX = {
@@ -208,6 +333,7 @@ export const TOOLBOX = {
         { kind: "block", type: "tina_add_role" },
         { kind: "block", type: "tina_remove_role" },
         { kind: "block", type: "tina_add_reaction" },
+        { kind: "block", type: "tina_delete_message" },
       ],
     },
     {
@@ -217,6 +343,7 @@ export const TOOLBOX = {
       contents: [
         { kind: "block", type: "tina_kick" },
         { kind: "block", type: "tina_ban" },
+        { kind: "block", type: "tina_timeout" },
       ],
     },
     {
@@ -227,6 +354,7 @@ export const TOOLBOX = {
         { kind: "block", type: "tina_if" },
         { kind: "block", type: "tina_repeat" },
         { kind: "block", type: "tina_wait" },
+        { kind: "block", type: "tina_stop" },
       ],
     },
     {
@@ -235,6 +363,32 @@ export const TOOLBOX = {
       colour: String(VARIABLE_COLOUR),
       contents: [{ kind: "block", type: "tina_set_variable" }],
     },
+    {
+      kind: "category",
+      name: "Serveur",
+      colour: String(SERVER_COLOUR),
+      contents: [
+        { kind: "block", type: "tina_create_channel" },
+        { kind: "block", type: "tina_delete_channel" },
+        { kind: "block", type: "tina_create_role" },
+        { kind: "block", type: "tina_delete_role" },
+        { kind: "block", type: "tina_move_voice" },
+      ],
+    },
+    {
+      kind: "category",
+      name: "Economie",
+      colour: String(ECONOMY_COLOUR),
+      contents: [
+        { kind: "block", type: "tina_add_currency" },
+        { kind: "block", type: "tina_remove_currency" },
+      ],
+    },
+    {
+      kind: "category",
+      name: "Avance",
+      colour: String(ADVANCED_COLOUR),
+      contents: [{ kind: "block", type: "tina_http_request" }],
+    },
   ],
 };
-

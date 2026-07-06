@@ -101,3 +101,45 @@ export async function sendShoutout(
   );
   return Boolean(res?.ok);
 }
+
+export async function getStreamStartedAt(ctx: HelixContext, broadcasterId: string): Promise<Date | null> {
+  const res = await helixFetch(ctx, `/streams?user_id=${broadcasterId}`);
+  if (!res || !res.ok) return null;
+  const data = (await res.json()) as { data: { started_at: string }[] };
+  const startedAt = data.data[0]?.started_at;
+  return startedAt ? new Date(startedAt) : null;
+}
+
+export async function getFollowedAt(ctx: HelixContext, broadcasterId: string, userId: string): Promise<Date | null> {
+  const res = await helixFetch(ctx, `/channels/followers?broadcaster_id=${broadcasterId}&user_id=${userId}`);
+  if (!res || !res.ok) return null;
+  const data = (await res.json()) as { data: { followed_at: string }[] };
+  const followedAt = data.data[0]?.followed_at;
+  return followedAt ? new Date(followedAt) : null;
+}
+
+export interface RecentFollower {
+  userName: string;
+  followedAt: Date;
+}
+
+export async function getRecentFollowers(ctx: HelixContext, broadcasterId: string, first = 20): Promise<RecentFollower[]> {
+  const res = await helixFetch(ctx, `/channels/followers?broadcaster_id=${broadcasterId}&first=${first}`);
+  if (!res || !res.ok) return [];
+  const data = (await res.json()) as { data: { user_name: string; followed_at: string }[] };
+  return data.data.map((d) => ({ userName: d.user_name, followedAt: new Date(d.followed_at) }));
+}
+
+export async function getSubscriberCount(ctx: HelixContext, broadcasterId: string): Promise<number | null> {
+  const res = await helixFetch(ctx, `/subscriptions?broadcaster_id=${broadcasterId}&first=1`);
+  if (!res || !res.ok) return null;
+  const data = (await res.json()) as { total?: number };
+  return typeof data.total === "number" ? data.total : null;
+}
+
+export async function getChatters(ctx: HelixContext, broadcasterId: string, moderatorId: string): Promise<string[]> {
+  const res = await helixFetch(ctx, `/chat/chatters?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}&first=1000`);
+  if (!res || !res.ok) return [];
+  const data = (await res.json()) as { data: { user_login: string }[] };
+  return data.data.map((d) => d.user_login);
+}

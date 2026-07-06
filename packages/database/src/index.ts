@@ -11,3 +11,4 @@ export * from "./twitch-giveaways.js";
 export * from "./twitch-stats.js";
 export * from "./custom-command-variables.js";
 export * from "./xp.js";
+export * from "./economy.js";

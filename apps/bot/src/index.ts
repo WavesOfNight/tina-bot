@@ -23,14 +23,15 @@ function createClient(): Client {
       GatewayIntentBits.GuildMessageReactions,
       GatewayIntentBits.GuildVoiceStates,
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
+    partials: [Partials.Message, Partials.Channel, Partials.GuildMember, Partials.Reaction],
   });
 
   for (const event of events) {
+    const execute = event.execute as (...args: unknown[]) => Promise<void>;
     if (event.once) {
-      client.once(event.name, (...args) => event.execute(...(args as [never])));
+      client.once(event.name, (...args) => execute(...args));
     } else {
-      client.on(event.name, (...args) => event.execute(...(args as [never])));
+      client.on(event.name, (...args) => execute(...args));
     }
   }
 
