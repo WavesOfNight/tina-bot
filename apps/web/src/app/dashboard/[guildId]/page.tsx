@@ -1,4 +1,5 @@
 import { prisma } from "@tina/database";
+import { getGuildMemberDisplayNames } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
 import { LayoutDashboard } from "lucide-react";
 
@@ -24,6 +25,11 @@ export default async function OverviewPage({ params }: { params: { guildId: stri
     prisma.member.findMany({ where: { guildId }, orderBy: { xp: "desc" }, take: 5 }),
     prisma.autoResponse.count({ where: { guildId } }),
     prisma.socialAlert.count({ where: { guildId } }),
+  ]);
+
+  const displayNames = await getGuildMemberDisplayNames(guildId, [
+    ...topMembers.map((m) => m.userId),
+    ...recentCases.map((c) => c.userId),
   ]);
 
   const cards = [
@@ -56,7 +62,7 @@ export default async function OverviewPage({ params }: { params: { guildId: stri
             {topMembers.map((m, i) => (
               <div key={m.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm odd:bg-white/40">
                 <span>
-                  #{i + 1} - {m.userId}
+                  #{i + 1} - {displayNames.get(m.userId) ?? m.userId}
                 </span>
                 <span className="rounded-full bg-aqua-100 px-2 py-0.5 text-xs font-medium text-aqua-800">Nv {m.level}</span>
               </div>
@@ -71,7 +77,7 @@ export default async function OverviewPage({ params }: { params: { guildId: stri
             {recentCases.map((c) => (
               <div key={c.id} className="rounded-lg px-2 py-1.5 text-sm odd:bg-white/40">
                 <span className="font-medium text-lavender-900">{TYPE_LABELS[c.type] ?? c.type}</span>{" "}
-                <span className="text-lavender-600">- {c.userId}</span>
+                <span className="text-lavender-600">- {displayNames.get(c.userId) ?? c.userId}</span>
               </div>
             ))}
           </div>

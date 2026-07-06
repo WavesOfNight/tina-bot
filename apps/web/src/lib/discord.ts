@@ -72,6 +72,27 @@ export async function createPermanentInvite(channelId: string): Promise<{ code: 
   return { code: invite.code };
 }
 
+export async function getGuildMemberDisplayNames(guildId: string, userIds: string[]): Promise<Map<string, string>> {
+  const config = await getBotConfig();
+  const map = new Map<string, string>();
+  if (!config) return map;
+
+  const uniqueIds = [...new Set(userIds)];
+  await Promise.all(
+    uniqueIds.map(async (userId) => {
+      const res = await fetch(`https://discord.com/api/guilds/${guildId}/members/${userId}`, {
+        headers: { Authorization: `Bot ${config.token}` },
+        cache: "no-store",
+      }).catch(() => null);
+      if (!res || !res.ok) return;
+      const member = (await res.json()) as { nick?: string | null; user?: { username: string; global_name?: string | null } };
+      const name = member.nick ?? member.user?.global_name ?? member.user?.username;
+      if (name) map.set(userId, name);
+    }),
+  );
+  return map;
+}
+
 export async function checkBotConnection(): Promise<{ connected: boolean; tag?: string }> {
   const config = await getBotConfig();
   if (!config) return { connected: false };

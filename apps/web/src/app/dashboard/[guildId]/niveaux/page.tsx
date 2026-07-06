@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
-import { getGuildRoles } from "@/lib/discord";
+import { getGuildRoles, getGuildMemberDisplayNames } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
 import { Trophy } from "lucide-react";
 
@@ -33,6 +33,7 @@ export default async function NiveauxPage({ params }: { params: { guildId: strin
     getGuildRoles(guildId),
   ]);
 
+  const displayNames = await getGuildMemberDisplayNames(guildId, top.map((m) => m.userId));
   const add = addReward.bind(null, guildId);
 
   return (
@@ -47,7 +48,7 @@ export default async function NiveauxPage({ params }: { params: { guildId: strin
             {top.map((m, i) => (
               <div key={m.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-sm odd:bg-white/40">
                 <span>
-                  #{i + 1} - {m.userId}
+                  #{i + 1} - {displayNames.get(m.userId) ?? m.userId}
                 </span>
                 <span className="rounded-full bg-aqua-100 px-2 py-0.5 text-xs font-medium text-aqua-800">Nv {m.level}</span>
               </div>

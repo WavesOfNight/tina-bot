@@ -1,4 +1,5 @@
 import { prisma } from "@tina/database";
+import { getGuildMemberDisplayNames } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
 import { Gamepad2 } from "lucide-react";
 
@@ -23,6 +24,7 @@ export default async function JeuxPage({ params }: { params: { guildId: string }
       prisma.gameStat.findMany({ where: { guildId, game: game.key }, orderBy: { wins: "desc" }, take: 10 }),
     ),
   );
+  const displayNames = await getGuildMemberDisplayNames(guildId, statsByGame.flat().map((g) => g.userId));
 
   return (
     <div>
@@ -43,7 +45,7 @@ export default async function JeuxPage({ params }: { params: { guildId: string }
                 {stats.length === 0 && <p className="text-sm text-lavender-600">Pas encore de partie jouee.</p>}
                 {stats.map((g) => (
                   <div key={g.id} className="flex items-center justify-between rounded-lg bg-white/40 px-2 py-1.5 text-sm">
-                    <span>{g.userId}</span>
+                    <span>{displayNames.get(g.userId) ?? g.userId}</span>
                     <span className="text-xs text-lavender-600">{game.statLabel(g)}</span>
                   </div>
                 ))}

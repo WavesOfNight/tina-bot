@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@tina/database";
-import { getGuildChannels } from "@/lib/discord";
+import { getGuildChannels, getGuildMemberDisplayNames } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
 import { ShieldCheck } from "lucide-react";
 
@@ -65,6 +65,7 @@ export default async function ModerationPage({ params }: { params: { guildId: st
     prisma.moderationCase.findMany({ where: { guildId }, orderBy: { createdAt: "desc" }, take: 20 }),
   ]);
 
+  const displayNames = await getGuildMemberDisplayNames(guildId, cases.map((c) => c.userId));
   const save = saveModConfig.bind(null, guildId);
 
   return (
@@ -151,7 +152,7 @@ export default async function ModerationPage({ params }: { params: { guildId: st
           <div key={c.id} className="flex items-center justify-between gap-3 border-b border-lavender-100 px-4 py-3 last:border-none">
             <div>
               <p className="text-sm font-medium text-lavender-900">
-                #{c.id} - {TYPE_LABELS[c.type] ?? c.type} - {c.userId}
+                #{c.id} - {TYPE_LABELS[c.type] ?? c.type} - {displayNames.get(c.userId) ?? c.userId}
               </p>
               <p className="text-xs text-lavender-600">{c.reason ?? "Aucune raison fournie"}</p>
             </div>
