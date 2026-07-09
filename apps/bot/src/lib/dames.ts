@@ -39,6 +39,10 @@ export function parseSquare(input: string): Square | null {
   return { file: match[1].toLowerCase().charCodeAt(0) - 97, rank: Number(match[2]) - 1 };
 }
 
+export function squareLabel(sq: Square): string {
+  return `${String.fromCharCode(97 + sq.file)}${sq.rank + 1}`;
+}
+
 function directionsFor(piece: CheckerPiece): number[] {
   if (piece.king) return [1, -1];
   return piece.color === "w" ? [1] : [-1];

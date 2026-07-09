@@ -32,6 +32,10 @@ export function squareLabel(sq: Square): string {
   return `${String.fromCharCode(97 + sq.file)}${sq.rank + 1}`;
 }
 
+export function opponentColor(color: PieceColor): PieceColor {
+  return color === "w" ? "b" : "w";
+}
+
 function inBounds(sq: Square): boolean {
   return sq.file >= 0 && sq.file <= 7 && sq.rank >= 0 && sq.rank <= 7;
 }

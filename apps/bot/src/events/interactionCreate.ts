@@ -2,6 +2,7 @@ import { Events, type Interaction } from "discord.js";
 import { prisma } from "@tina/database";
 import { commandMap } from "../commands/index.js";
 import { buttonHandlerMap } from "../buttons/index.js";
+import { selectMenuHandlerMap } from "../selectMenus/index.js";
 
 export const name = Events.InteractionCreate;
 export const once = false;
@@ -44,6 +45,25 @@ export async function execute(interaction: Interaction) {
       await handler.execute(interaction, parts);
     } catch (error) {
       console.error(`Erreur dans le bouton ${interaction.customId}`, error);
+      const payload = { content: "Une erreur est survenue.", ephemeral: true };
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(payload).catch(() => null);
+      } else {
+        await interaction.reply(payload).catch(() => null);
+      }
+    }
+    return;
+  }
+
+  if (interaction.isStringSelectMenu()) {
+    const [prefix, ...parts] = interaction.customId.split(":");
+    const handler = selectMenuHandlerMap.get(prefix);
+    if (!handler) return;
+
+    try {
+      await handler.execute(interaction, parts);
+    } catch (error) {
+      console.error(`Erreur dans le menu ${interaction.customId}`, error);
       const payload = { content: "Une erreur est survenue.", ephemeral: true };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(payload).catch(() => null);
