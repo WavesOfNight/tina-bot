@@ -1,7 +1,7 @@
 import type { ButtonHandler } from "../types.js";
 import { damesGames } from "../lib/dames-store.js";
-import { applyCheckerMove, countPieces, hasAnyLegalMove, legalMovesForSquare, parseSquare, type CheckerColor } from "../lib/dames.js";
-import { bumpDamesStat, buildDamesEmbed, buildFromButtonRows, buildToButtonRows, endDamesGame, turnStatusLine } from "../lib/dames-ui.js";
+import { allLegalMoves, applyCheckerMove, countPieces, hasAnyLegalMove, parseSquare, type CheckerColor } from "../lib/dames.js";
+import { bumpDamesStat, buildDamesEmbed, buildMoveButtonRows, endDamesGame, turnStatusLine } from "../lib/dames-ui.js";
 
 function opponentColor(color: CheckerColor): CheckerColor {
   return color === "w" ? "b" : "w";
@@ -21,33 +21,13 @@ const handler: ButtonHandler = {
       return;
     }
 
-    if (action === "back") {
-      await interaction.update({ embeds: [buildDamesEmbed(game, turnStatusLine(game))], components: buildFromButtonRows(game) });
+    if (action === "page") {
+      const page = Number(a) || 0;
+      await interaction.update({ embeds: [buildDamesEmbed(game, turnStatusLine(game))], components: buildMoveButtonRows(game, page) });
       return;
     }
 
-    if (action === "from") {
-      const from = parseSquare(a);
-      const piece = from ? game.board[from.rank][from.file] : null;
-      if (!from || !piece || piece.color !== game.turn) {
-        await interaction.reply({ content: "Selection invalide, relance `/dames voir`.", ephemeral: true });
-        return;
-      }
-
-      const toRows = buildToButtonRows(game, from);
-      if (toRows.length === 0) {
-        await interaction.reply({ content: "Ce pion n'a plus de coup possible, relance `/dames voir`.", ephemeral: true });
-        return;
-      }
-
-      await interaction.update({
-        embeds: [buildDamesEmbed(game, `<@${interaction.user.id}>, choisis la destination pour ton pion en ${a}.`)],
-        components: toRows,
-      });
-      return;
-    }
-
-    // action === "to"
+    // action === "move"
     const from = parseSquare(a);
     const to = parseSquare(b);
     const piece = from ? game.board[from.rank][from.file] : null;
@@ -56,14 +36,16 @@ const handler: ButtonHandler = {
       return;
     }
 
-    const possible = legalMovesForSquare(game.board, from);
-    const chosen = possible.find((m) => m.to.file === to.file && m.to.rank === to.rank);
+    const possible = allLegalMoves(game.board, game.turn);
+    const chosen = possible.find(
+      (m) => m.from.file === from.file && m.from.rank === from.rank && m.move.to.file === to.file && m.move.to.rank === to.rank,
+    );
     if (!chosen) {
       await interaction.reply({ content: "Coup illegal, relance `/dames voir`.", ephemeral: true });
       return;
     }
 
-    game.board = applyCheckerMove(game.board, from, chosen);
+    game.board = applyCheckerMove(game.board, from, chosen.move);
     const nextTurn = opponentColor(game.turn);
     game.turn = nextTurn;
 
@@ -80,7 +62,7 @@ const handler: ButtonHandler = {
 
     await interaction.update({
       embeds: [buildDamesEmbed(game, turnStatusLine(game))],
-      components: buildFromButtonRows(game),
+      components: buildMoveButtonRows(game),
     });
   },
 };

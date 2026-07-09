@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
 import { chessGames, createChessGame } from "../../lib/chess-store.js";
-import { bumpChessStat, buildChessEmbed, buildFromButtonRows, turnStatusLine } from "../../lib/chess-ui.js";
+import { bumpChessStat, buildChessEmbed, buildMoveButtonRows, turnStatusLine } from "../../lib/chess-ui.js";
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -35,7 +35,7 @@ const command: Command = {
       const game = createChessGame(interaction.channelId, interaction.guildId, interaction.user.id, opponent.id);
       await interaction.reply({
         embeds: [buildChessEmbed(game, `${interaction.user} (blancs) contre ${opponent} (noirs). Aux blancs de jouer !`)],
-        components: buildFromButtonRows(game),
+        components: buildMoveButtonRows(game),
       });
       return;
     }
@@ -49,7 +49,7 @@ const command: Command = {
     if (sub === "voir") {
       await interaction.reply({
         embeds: [buildChessEmbed(game, turnStatusLine(game))],
-        components: buildFromButtonRows(game),
+        components: buildMoveButtonRows(game),
       });
       return;
     }

@@ -2,14 +2,23 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "disc
 import { prisma } from "@tina/database";
 import type { DamesGame } from "./dames-store.js";
 import { damesGames } from "./dames-store.js";
-import { legalMovesForSquare, renderCheckerBoard, squareLabel, type Square } from "./dames.js";
+import { allLegalMoves, renderCheckerBoard, squareLabel, type CheckerMove, type Square } from "./dames.js";
+
+const SINGLE_PAGE_MAX = 24;
+const PAGE_SIZE = 20;
 
 function chunkRows(buttons: ButtonBuilder[]): ActionRowBuilder<ButtonBuilder>[] {
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
   for (let i = 0; i < buttons.length; i += 5) {
     rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
   }
-  return rows.slice(0, 5);
+  return rows;
+}
+
+function sortMoves(moves: { from: Square; move: CheckerMove }[]) {
+  return [...moves].sort(
+    (a, b) => a.from.rank - b.from.rank || a.from.file - b.from.file || a.move.to.rank - b.move.to.rank || a.move.to.file - b.move.to.file,
+  );
 }
 
 export function buildDamesEmbed(game: DamesGame, statusLine: string) {
@@ -21,49 +30,56 @@ export function buildDamesEmbed(game: DamesGame, statusLine: string) {
       { name: "Blancs (w)", value: `<@${game.players.w}>`, inline: true },
       { name: "Noirs (b)", value: `<@${game.players.b}>`, inline: true },
     )
-    .setFooter({ text: "Clique sur un pion, puis sur sa destination." });
+    .setFooter({ text: "Clique directement sur le coup que tu veux jouer." });
 }
 
 export function turnStatusLine(game: DamesGame): string {
   return `Au tour de <@${game.players[game.turn]}> (${game.turn === "w" ? "blancs" : "noirs"}).`;
 }
 
-export function buildFromButtonRows(game: DamesGame): ActionRowBuilder<ButtonBuilder>[] {
-  const buttons: ButtonBuilder[] = [];
-  for (let rank = 0; rank < 8; rank++) {
-    for (let file = 0; file < 8; file++) {
-      const piece = game.board[rank][file];
-      if (!piece || piece.color !== game.turn) continue;
-      const from: Square = { file, rank };
-      if (legalMovesForSquare(game.board, from).length === 0) continue;
-      buttons.push(
-        new ButtonBuilder()
-          .setCustomId(`dames:${game.channelId}:from:${squareLabel(from)}`)
-          .setLabel(`${piece.king ? (piece.color === "w" ? "🟠" : "🟣") : piece.color === "w" ? "⚪" : "⚫"} ${squareLabel(from)}`)
-          .setStyle(ButtonStyle.Secondary),
-      );
-    }
-  }
-  return chunkRows(buttons.slice(0, 25));
-}
-
-export function buildToButtonRows(game: DamesGame, from: Square): ActionRowBuilder<ButtonBuilder>[] {
-  const moves = legalMovesForSquare(game.board, from);
+export function buildMoveButtonRows(game: DamesGame, page = 0): ActionRowBuilder<ButtonBuilder>[] {
+  const moves = sortMoves(allLegalMoves(game.board, game.turn));
   if (moves.length === 0) return [];
 
-  const buttons = moves.slice(0, 24).map((move) => {
+  const toButton = (m: { from: Square; move: CheckerMove }) => {
+    const piece = game.board[m.from.rank][m.from.file]!;
+    const pieceEmoji = piece.king ? (piece.color === "w" ? "🟠" : "🟣") : piece.color === "w" ? "⚪" : "⚫";
     return new ButtonBuilder()
-      .setCustomId(`dames:${game.channelId}:to:${squareLabel(from)}:${squareLabel(move.to)}`)
-      .setLabel(move.captured ? `${squareLabel(move.to)} ⚔️` : squareLabel(move.to))
-      .setStyle(move.captured ? ButtonStyle.Danger : ButtonStyle.Primary);
-  });
-  buttons.push(
-    new ButtonBuilder()
-      .setCustomId(`dames:${game.channelId}:back`)
-      .setLabel("↩️ Changer de pion")
-      .setStyle(ButtonStyle.Secondary),
+      .setCustomId(`dames:${game.channelId}:move:${squareLabel(m.from)}:${squareLabel(m.move.to)}`)
+      .setLabel(`${pieceEmoji} ${squareLabel(m.from)}→${squareLabel(m.move.to)}${m.move.captured ? " ⚔️" : ""}`)
+      .setStyle(m.move.captured ? ButtonStyle.Danger : ButtonStyle.Primary);
+  };
+
+  if (moves.length <= SINGLE_PAGE_MAX) {
+    return chunkRows(moves.map(toButton));
+  }
+
+  const totalPages = Math.ceil(moves.length / PAGE_SIZE);
+  const clampedPage = Math.min(Math.max(page, 0), totalPages - 1);
+  const pageMoves = moves.slice(clampedPage * PAGE_SIZE, clampedPage * PAGE_SIZE + PAGE_SIZE);
+  const rows = chunkRows(pageMoves.map(toButton));
+
+  rows.push(
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`dames:${game.channelId}:page:${clampedPage - 1}`)
+        .setLabel("◀️ Precedent")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(clampedPage === 0),
+      new ButtonBuilder()
+        .setCustomId(`dames:${game.channelId}:page:${clampedPage}`)
+        .setLabel(`Page ${clampedPage + 1}/${totalPages}`)
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(true),
+      new ButtonBuilder()
+        .setCustomId(`dames:${game.channelId}:page:${clampedPage + 1}`)
+        .setLabel("Suivant ▶️")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(clampedPage >= totalPages - 1),
+    ),
   );
-  return chunkRows(buttons);
+
+  return rows;
 }
 
 export async function bumpDamesStat(guildId: string, userId: string, field: "wins" | "losses" | "draws") {

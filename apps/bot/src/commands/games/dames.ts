@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
 import { damesGames, createDamesGame } from "../../lib/dames-store.js";
-import { bumpDamesStat, buildDamesEmbed, buildFromButtonRows, turnStatusLine } from "../../lib/dames-ui.js";
+import { bumpDamesStat, buildDamesEmbed, buildMoveButtonRows, turnStatusLine } from "../../lib/dames-ui.js";
 
 const command: Command = {
   data: new SlashCommandBuilder()
@@ -35,7 +35,7 @@ const command: Command = {
       const game = createDamesGame(interaction.channelId, interaction.guildId, interaction.user.id, opponent.id);
       await interaction.reply({
         embeds: [buildDamesEmbed(game, `${interaction.user} (blancs) contre ${opponent} (noirs). Aux blancs de jouer !`)],
-        components: buildFromButtonRows(game),
+        components: buildMoveButtonRows(game),
       });
       return;
     }
@@ -49,7 +49,7 @@ const command: Command = {
     if (sub === "voir") {
       await interaction.reply({
         embeds: [buildDamesEmbed(game, turnStatusLine(game))],
-        components: buildFromButtonRows(game),
+        components: buildMoveButtonRows(game),
       });
       return;
     }

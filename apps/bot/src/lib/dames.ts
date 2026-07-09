@@ -105,6 +105,19 @@ export function hasAnyLegalMove(board: CheckerBoard, color: CheckerColor): boole
   return false;
 }
 
+export function allLegalMoves(board: CheckerBoard, color: CheckerColor): { from: Square; move: CheckerMove }[] {
+  const moves: { from: Square; move: CheckerMove }[] = [];
+  for (let rank = 0; rank < 8; rank++) {
+    for (let file = 0; file < 8; file++) {
+      const piece = board[rank][file];
+      if (piece?.color !== color) continue;
+      const from: Square = { file, rank };
+      for (const move of legalMovesForSquare(board, from)) moves.push({ from, move });
+    }
+  }
+  return moves;
+}
+
 const LIGHT_SQUARE = "⬜";
 const DARK_SQUARE = "🟫";
 const WHITE_MAN = "⚪";

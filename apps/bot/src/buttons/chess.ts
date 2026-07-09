@@ -1,7 +1,7 @@
 import type { ButtonHandler } from "../types.js";
 import { chessGames } from "../lib/chess-store.js";
-import { allLegalMoves, applyMove, isInCheck, legalMoves, opponentColor, parseSquare } from "../lib/chess.js";
-import { bumpChessStat, buildChessEmbed, buildFromButtonRows, buildToButtonRows, endChessGame, turnStatusLine } from "../lib/chess-ui.js";
+import { allLegalMoves, applyMove, isInCheck, opponentColor, parseSquare } from "../lib/chess.js";
+import { bumpChessStat, buildChessEmbed, buildMoveButtonRows, endChessGame, turnStatusLine } from "../lib/chess-ui.js";
 
 const handler: ButtonHandler = {
   prefix: "chess",
@@ -17,33 +17,13 @@ const handler: ButtonHandler = {
       return;
     }
 
-    if (action === "back") {
-      await interaction.update({ embeds: [buildChessEmbed(game, turnStatusLine(game))], components: buildFromButtonRows(game) });
+    if (action === "page") {
+      const page = Number(a) || 0;
+      await interaction.update({ embeds: [buildChessEmbed(game, turnStatusLine(game))], components: buildMoveButtonRows(game, page) });
       return;
     }
 
-    if (action === "from") {
-      const from = parseSquare(a);
-      const piece = from ? game.board[from.rank][from.file] : null;
-      if (!from || !piece || piece.color !== game.turn) {
-        await interaction.reply({ content: "Selection invalide, relance `/echecs voir`.", ephemeral: true });
-        return;
-      }
-
-      const toRows = buildToButtonRows(game, from);
-      if (toRows.length === 0) {
-        await interaction.reply({ content: "Cette piece n'a plus de coup possible, relance `/echecs voir`.", ephemeral: true });
-        return;
-      }
-
-      await interaction.update({
-        embeds: [buildChessEmbed(game, `<@${interaction.user.id}>, choisis la destination pour ta piece en ${a}.`)],
-        components: toRows,
-      });
-      return;
-    }
-
-    // action === "to"
+    // action === "move"
     const from = parseSquare(a);
     const to = parseSquare(b);
     const piece = from ? game.board[from.rank][from.file] : null;
@@ -52,8 +32,9 @@ const handler: ButtonHandler = {
       return;
     }
 
-    const possible = legalMoves(game.board, from);
-    if (!possible.some((m) => m.file === to.file && m.rank === to.rank)) {
+    const possible = allLegalMoves(game.board, game.turn);
+    const isLegal = possible.some((m) => m.from.file === from.file && m.from.rank === from.rank && m.to.file === to.file && m.to.rank === to.rank);
+    if (!isLegal) {
       await interaction.reply({ content: "Coup illegal, relance `/echecs voir`.", ephemeral: true });
       return;
     }
@@ -88,7 +69,7 @@ const handler: ButtonHandler = {
     const checkLine = inCheck ? " Echec !" : "";
     await interaction.update({
       embeds: [buildChessEmbed(game, `Au tour de <@${game.players[nextTurn]}> (${nextTurn === "w" ? "blancs" : "noirs"}).${checkLine}`)],
-      components: buildFromButtonRows(game),
+      components: buildMoveButtonRows(game),
     });
   },
 };
