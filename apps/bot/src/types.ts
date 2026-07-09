@@ -2,7 +2,6 @@ import type {
   ButtonInteraction,
   ChatInputCommandInteraction,
   RESTPostAPIChatInputApplicationCommandsJSONBody,
-  StringSelectMenuInteraction,
 } from "discord.js";
 
 export interface Command {
@@ -13,9 +12,4 @@ export interface Command {
 export interface ButtonHandler {
   prefix: string;
   execute: (interaction: ButtonInteraction, parts: string[]) => Promise<void>;
-}
-
-export interface SelectMenuHandler {
-  prefix: string;
-  execute: (interaction: StringSelectMenuInteraction, parts: string[]) => Promise<void>;
 }

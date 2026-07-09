@@ -1,17 +1,21 @@
-import { ActionRowBuilder, EmbedBuilder, StringSelectMenuBuilder } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { prisma } from "@tina/database";
 import type { ChessGame } from "./chess-store.js";
 import { chessGames } from "./chess-store.js";
-import { isInCheck, legalMoves, renderBoard, squareLabel, type PieceType, type Square } from "./chess.js";
+import { isInCheck, legalMoves, renderBoard, squareLabel, type PieceColor, type PieceType, type Square } from "./chess.js";
 
-const PIECE_NAMES: Record<PieceType, string> = {
-  P: "Pion",
-  N: "Cavalier",
-  B: "Fou",
-  R: "Tour",
-  Q: "Dame",
-  K: "Roi",
+const PIECE_EMOJI: Record<PieceColor, Record<PieceType, string>> = {
+  w: { P: "♙", N: "♘", B: "♗", R: "♖", Q: "♕", K: "♔" },
+  b: { P: "♟", N: "♞", B: "♝", R: "♜", Q: "♛", K: "♚" },
 };
+
+function chunkRows(buttons: ButtonBuilder[]): ActionRowBuilder<ButtonBuilder>[] {
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < buttons.length; i += 5) {
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
+  }
+  return rows.slice(0, 5);
+}
 
 export function buildChessEmbed(game: ChessGame, statusLine: string) {
   return new EmbedBuilder()
@@ -22,7 +26,7 @@ export function buildChessEmbed(game: ChessGame, statusLine: string) {
       { name: "Blancs", value: `<@${game.players.w}>`, inline: true },
       { name: "Noirs", value: `<@${game.players.b}>`, inline: true },
     )
-    .setFooter({ text: "Choisis une piece, puis sa destination dans les menus ci-dessous." });
+    .setFooter({ text: "Clique sur une piece, puis sur sa destination." });
 }
 
 export function turnStatusLine(game: ChessGame): string {
@@ -30,41 +34,43 @@ export function turnStatusLine(game: ChessGame): string {
   return `Au tour de <@${game.players[game.turn]}> (${game.turn === "w" ? "blancs" : "noirs"}).${check}`;
 }
 
-export function buildFromSelectRow(game: ChessGame): ActionRowBuilder<StringSelectMenuBuilder> | null {
-  const options: { label: string; value: string }[] = [];
+export function buildFromButtonRows(game: ChessGame): ActionRowBuilder<ButtonBuilder>[] {
+  const buttons: ButtonBuilder[] = [];
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const piece = game.board[rank][file];
       if (!piece || piece.color !== game.turn) continue;
       const from: Square = { file, rank };
       if (legalMoves(game.board, from).length === 0) continue;
-      options.push({ label: `${PIECE_NAMES[piece.type]} en ${squareLabel(from)}`, value: squareLabel(from) });
+      buttons.push(
+        new ButtonBuilder()
+          .setCustomId(`chess:${game.channelId}:from:${squareLabel(from)}`)
+          .setLabel(`${PIECE_EMOJI[piece.color][piece.type]} ${squareLabel(from)}`)
+          .setStyle(ButtonStyle.Secondary),
+      );
     }
   }
-  if (options.length === 0) return null;
-
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId(`chess:${game.channelId}:from`)
-    .setPlaceholder("Choisis une piece a deplacer")
-    .addOptions(options.slice(0, 25));
-  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+  return chunkRows(buttons.slice(0, 25));
 }
 
-export function buildToSelectRow(game: ChessGame, from: Square): ActionRowBuilder<StringSelectMenuBuilder> | null {
+export function buildToButtonRows(game: ChessGame, from: Square): ActionRowBuilder<ButtonBuilder>[] {
   const moves = legalMoves(game.board, from);
-  if (moves.length === 0) return null;
+  if (moves.length === 0) return [];
 
-  const options = moves.slice(0, 24).map((to) => {
+  const buttons = moves.slice(0, 24).map((to) => {
     const captured = game.board[to.rank][to.file];
-    return { label: captured ? `${squareLabel(to)} (prise !)` : squareLabel(to), value: squareLabel(to) };
+    return new ButtonBuilder()
+      .setCustomId(`chess:${game.channelId}:to:${squareLabel(from)}:${squareLabel(to)}`)
+      .setLabel(captured ? `${squareLabel(to)} ⚔️` : squareLabel(to))
+      .setStyle(captured ? ButtonStyle.Danger : ButtonStyle.Primary);
   });
-  options.push({ label: "Changer de piece", value: "__back__" });
-
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId(`chess:${game.channelId}:to:${squareLabel(from)}`)
-    .setPlaceholder(`Destination pour ta piece en ${squareLabel(from)}`)
-    .addOptions(options);
-  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+  buttons.push(
+    new ButtonBuilder()
+      .setCustomId(`chess:${game.channelId}:back`)
+      .setLabel("↩️ Changer de piece")
+      .setStyle(ButtonStyle.Secondary),
+  );
+  return chunkRows(buttons);
 }
 
 export async function bumpChessStat(guildId: string, userId: string, field: "wins" | "losses" | "draws") {

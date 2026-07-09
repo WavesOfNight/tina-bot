@@ -1,16 +1,16 @@
-import type { SelectMenuHandler } from "../types.js";
+import type { ButtonHandler } from "../types.js";
 import { damesGames } from "../lib/dames-store.js";
 import { applyCheckerMove, countPieces, hasAnyLegalMove, legalMovesForSquare, parseSquare, type CheckerColor } from "../lib/dames.js";
-import { buildDamesEmbed, buildFromSelectRow, buildToSelectRow, endDamesGame, turnStatusLine } from "../lib/dames-ui.js";
+import { bumpDamesStat, buildDamesEmbed, buildFromButtonRows, buildToButtonRows, endDamesGame, turnStatusLine } from "../lib/dames-ui.js";
 
 function opponentColor(color: CheckerColor): CheckerColor {
   return color === "w" ? "b" : "w";
 }
 
-const handler: SelectMenuHandler = {
+const handler: ButtonHandler = {
   prefix: "dames",
   async execute(interaction, parts) {
-    const [channelId, step, fromSquareStr] = parts;
+    const [channelId, action, a, b] = parts;
     const game = damesGames.get(channelId);
     if (!game?.active) {
       await interaction.reply({ content: "Cette partie n'existe plus. Relance `/dames voir`.", ephemeral: true });
@@ -21,47 +21,37 @@ const handler: SelectMenuHandler = {
       return;
     }
 
-    if (step === "from") {
-      const from = parseSquare(interaction.values[0]);
+    if (action === "back") {
+      await interaction.update({ embeds: [buildDamesEmbed(game, turnStatusLine(game))], components: buildFromButtonRows(game) });
+      return;
+    }
+
+    if (action === "from") {
+      const from = parseSquare(a);
       const piece = from ? game.board[from.rank][from.file] : null;
       if (!from || !piece || piece.color !== game.turn) {
         await interaction.reply({ content: "Selection invalide, relance `/dames voir`.", ephemeral: true });
         return;
       }
 
-      const toRow = buildToSelectRow(game, from);
-      if (!toRow) {
+      const toRows = buildToButtonRows(game, from);
+      if (toRows.length === 0) {
         await interaction.reply({ content: "Ce pion n'a plus de coup possible, relance `/dames voir`.", ephemeral: true });
         return;
       }
 
       await interaction.update({
-        embeds: [buildDamesEmbed(game, `<@${interaction.user.id}>, choisis la destination pour ton pion en ${interaction.values[0]}.`)],
-        components: [toRow],
+        embeds: [buildDamesEmbed(game, `<@${interaction.user.id}>, choisis la destination pour ton pion en ${a}.`)],
+        components: toRows,
       });
       return;
     }
 
-    // step === "to"
-    const from = parseSquare(fromSquareStr);
-    if (!from) {
-      await interaction.reply({ content: "Selection invalide, relance `/dames voir`.", ephemeral: true });
-      return;
-    }
-
-    if (interaction.values[0] === "__back__") {
-      const fromRow = buildFromSelectRow(game);
-      if (!fromRow) {
-        await interaction.reply({ content: "Aucun coup possible, relance `/dames voir`.", ephemeral: true });
-        return;
-      }
-      await interaction.update({ embeds: [buildDamesEmbed(game, turnStatusLine(game))], components: [fromRow] });
-      return;
-    }
-
-    const to = parseSquare(interaction.values[0]);
-    const piece = game.board[from.rank][from.file];
-    if (!to || !piece || piece.color !== game.turn) {
+    // action === "to"
+    const from = parseSquare(a);
+    const to = parseSquare(b);
+    const piece = from ? game.board[from.rank][from.file] : null;
+    if (!from || !to || !piece || piece.color !== game.turn) {
       await interaction.reply({ content: "Selection invalide, relance `/dames voir`.", ephemeral: true });
       return;
     }
@@ -88,10 +78,9 @@ const handler: SelectMenuHandler = {
       return;
     }
 
-    const fromRow = buildFromSelectRow(game);
     await interaction.update({
       embeds: [buildDamesEmbed(game, turnStatusLine(game))],
-      components: fromRow ? [fromRow] : [],
+      components: buildFromButtonRows(game),
     });
   },
 };

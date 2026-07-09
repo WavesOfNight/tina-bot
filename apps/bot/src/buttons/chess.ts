@@ -1,12 +1,12 @@
-import type { SelectMenuHandler } from "../types.js";
+import type { ButtonHandler } from "../types.js";
 import { chessGames } from "../lib/chess-store.js";
 import { allLegalMoves, applyMove, isInCheck, legalMoves, opponentColor, parseSquare } from "../lib/chess.js";
-import { bumpChessStat, buildChessEmbed, buildFromSelectRow, buildToSelectRow, endChessGame, turnStatusLine } from "../lib/chess-ui.js";
+import { bumpChessStat, buildChessEmbed, buildFromButtonRows, buildToButtonRows, endChessGame, turnStatusLine } from "../lib/chess-ui.js";
 
-const handler: SelectMenuHandler = {
+const handler: ButtonHandler = {
   prefix: "chess",
   async execute(interaction, parts) {
-    const [channelId, step, fromSquareStr] = parts;
+    const [channelId, action, a, b] = parts;
     const game = chessGames.get(channelId);
     if (!game?.active) {
       await interaction.reply({ content: "Cette partie n'existe plus. Relance `/echecs voir`.", ephemeral: true });
@@ -17,47 +17,37 @@ const handler: SelectMenuHandler = {
       return;
     }
 
-    if (step === "from") {
-      const from = parseSquare(interaction.values[0]);
+    if (action === "back") {
+      await interaction.update({ embeds: [buildChessEmbed(game, turnStatusLine(game))], components: buildFromButtonRows(game) });
+      return;
+    }
+
+    if (action === "from") {
+      const from = parseSquare(a);
       const piece = from ? game.board[from.rank][from.file] : null;
       if (!from || !piece || piece.color !== game.turn) {
         await interaction.reply({ content: "Selection invalide, relance `/echecs voir`.", ephemeral: true });
         return;
       }
 
-      const toRow = buildToSelectRow(game, from);
-      if (!toRow) {
+      const toRows = buildToButtonRows(game, from);
+      if (toRows.length === 0) {
         await interaction.reply({ content: "Cette piece n'a plus de coup possible, relance `/echecs voir`.", ephemeral: true });
         return;
       }
 
       await interaction.update({
-        embeds: [buildChessEmbed(game, `<@${interaction.user.id}>, choisis la destination pour ta piece en ${interaction.values[0]}.`)],
-        components: [toRow],
+        embeds: [buildChessEmbed(game, `<@${interaction.user.id}>, choisis la destination pour ta piece en ${a}.`)],
+        components: toRows,
       });
       return;
     }
 
-    // step === "to"
-    const from = parseSquare(fromSquareStr);
-    if (!from) {
-      await interaction.reply({ content: "Selection invalide, relance `/echecs voir`.", ephemeral: true });
-      return;
-    }
-
-    if (interaction.values[0] === "__back__") {
-      const fromRow = buildFromSelectRow(game);
-      if (!fromRow) {
-        await interaction.reply({ content: "Aucun coup possible, relance `/echecs voir`.", ephemeral: true });
-        return;
-      }
-      await interaction.update({ embeds: [buildChessEmbed(game, turnStatusLine(game))], components: [fromRow] });
-      return;
-    }
-
-    const to = parseSquare(interaction.values[0]);
-    const piece = game.board[from.rank][from.file];
-    if (!to || !piece || piece.color !== game.turn) {
+    // action === "to"
+    const from = parseSquare(a);
+    const to = parseSquare(b);
+    const piece = from ? game.board[from.rank][from.file] : null;
+    if (!from || !to || !piece || piece.color !== game.turn) {
       await interaction.reply({ content: "Selection invalide, relance `/echecs voir`.", ephemeral: true });
       return;
     }
@@ -96,10 +86,9 @@ const handler: SelectMenuHandler = {
     }
 
     const checkLine = inCheck ? " Echec !" : "";
-    const fromRow = buildFromSelectRow(game);
     await interaction.update({
       embeds: [buildChessEmbed(game, `Au tour de <@${game.players[nextTurn]}> (${nextTurn === "w" ? "blancs" : "noirs"}).${checkLine}`)],
-      components: fromRow ? [fromRow] : [],
+      components: buildFromButtonRows(game),
     });
   },
 };

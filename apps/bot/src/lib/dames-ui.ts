@@ -1,8 +1,16 @@
-import { ActionRowBuilder, EmbedBuilder, StringSelectMenuBuilder } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { prisma } from "@tina/database";
 import type { DamesGame } from "./dames-store.js";
 import { damesGames } from "./dames-store.js";
 import { legalMovesForSquare, renderCheckerBoard, squareLabel, type Square } from "./dames.js";
+
+function chunkRows(buttons: ButtonBuilder[]): ActionRowBuilder<ButtonBuilder>[] {
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < buttons.length; i += 5) {
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
+  }
+  return rows.slice(0, 5);
+}
 
 export function buildDamesEmbed(game: DamesGame, statusLine: string) {
   return new EmbedBuilder()
@@ -13,48 +21,49 @@ export function buildDamesEmbed(game: DamesGame, statusLine: string) {
       { name: "Blancs (w)", value: `<@${game.players.w}>`, inline: true },
       { name: "Noirs (b)", value: `<@${game.players.b}>`, inline: true },
     )
-    .setFooter({ text: "Choisis un pion, puis sa destination dans les menus ci-dessous." });
+    .setFooter({ text: "Clique sur un pion, puis sur sa destination." });
 }
 
 export function turnStatusLine(game: DamesGame): string {
   return `Au tour de <@${game.players[game.turn]}> (${game.turn === "w" ? "blancs" : "noirs"}).`;
 }
 
-export function buildFromSelectRow(game: DamesGame): ActionRowBuilder<StringSelectMenuBuilder> | null {
-  const options: { label: string; value: string }[] = [];
+export function buildFromButtonRows(game: DamesGame): ActionRowBuilder<ButtonBuilder>[] {
+  const buttons: ButtonBuilder[] = [];
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const piece = game.board[rank][file];
       if (!piece || piece.color !== game.turn) continue;
       const from: Square = { file, rank };
       if (legalMovesForSquare(game.board, from).length === 0) continue;
-      options.push({ label: `${piece.king ? "Dame" : "Pion"} en ${squareLabel(from)}`, value: squareLabel(from) });
+      buttons.push(
+        new ButtonBuilder()
+          .setCustomId(`dames:${game.channelId}:from:${squareLabel(from)}`)
+          .setLabel(`${piece.king ? (piece.color === "w" ? "🟠" : "🟣") : piece.color === "w" ? "⚪" : "⚫"} ${squareLabel(from)}`)
+          .setStyle(ButtonStyle.Secondary),
+      );
     }
   }
-  if (options.length === 0) return null;
-
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId(`dames:${game.channelId}:from`)
-    .setPlaceholder("Choisis un pion a deplacer")
-    .addOptions(options.slice(0, 25));
-  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+  return chunkRows(buttons.slice(0, 25));
 }
 
-export function buildToSelectRow(game: DamesGame, from: Square): ActionRowBuilder<StringSelectMenuBuilder> | null {
+export function buildToButtonRows(game: DamesGame, from: Square): ActionRowBuilder<ButtonBuilder>[] {
   const moves = legalMovesForSquare(game.board, from);
-  if (moves.length === 0) return null;
+  if (moves.length === 0) return [];
 
-  const options = moves.slice(0, 24).map((move) => ({
-    label: move.captured ? `${squareLabel(move.to)} (prise !)` : squareLabel(move.to),
-    value: squareLabel(move.to),
-  }));
-  options.push({ label: "Changer de pion", value: "__back__" });
-
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId(`dames:${game.channelId}:to:${squareLabel(from)}`)
-    .setPlaceholder(`Destination pour ton pion en ${squareLabel(from)}`)
-    .addOptions(options);
-  return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+  const buttons = moves.slice(0, 24).map((move) => {
+    return new ButtonBuilder()
+      .setCustomId(`dames:${game.channelId}:to:${squareLabel(from)}:${squareLabel(move.to)}`)
+      .setLabel(move.captured ? `${squareLabel(move.to)} ⚔️` : squareLabel(move.to))
+      .setStyle(move.captured ? ButtonStyle.Danger : ButtonStyle.Primary);
+  });
+  buttons.push(
+    new ButtonBuilder()
+      .setCustomId(`dames:${game.channelId}:back`)
+      .setLabel("↩️ Changer de pion")
+      .setStyle(ButtonStyle.Secondary),
+  );
+  return chunkRows(buttons);
 }
 
 export async function bumpDamesStat(guildId: string, userId: string, field: "wins" | "losses" | "draws") {

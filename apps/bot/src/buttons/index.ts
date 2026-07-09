@@ -10,6 +10,8 @@ import reactionrole from "./reactionrole.js";
 import welcome from "./welcome.js";
 import blackjack from "./blackjack.js";
 import ticket from "./ticket.js";
+import chess from "./chess.js";
+import dames from "./dames.js";
 
 export const buttonHandlers: ButtonHandler[] = [
   morpion,
@@ -23,6 +25,8 @@ export const buttonHandlers: ButtonHandler[] = [
   welcome,
   blackjack,
   ticket,
+  chess,
+  dames,
 ];
 
 export const buttonHandlerMap = new Map(buttonHandlers.map((handler) => [handler.prefix, handler]));
