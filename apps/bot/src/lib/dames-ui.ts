@@ -8,7 +8,7 @@ export function buildDamesEmbed(game: DamesGame, statusLine: string) {
   return new EmbedBuilder()
     .setColor(0x9fe1cb)
     .setTitle("⛃ Dames")
-    .setDescription(`\`\`\`\n${renderCheckerBoard(game.board)}\n\`\`\`\n${statusLine}`)
+    .setDescription(`${renderCheckerBoard(game.board)}\n\n${statusLine}`)
     .addFields(
       { name: "Blancs (w)", value: `<@${game.players.w}>`, inline: true },
       { name: "Noirs (b)", value: `<@${game.players.b}>`, inline: true },

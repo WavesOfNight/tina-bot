@@ -17,7 +17,7 @@ export function buildChessEmbed(game: ChessGame, statusLine: string) {
   return new EmbedBuilder()
     .setColor(0x7f77dd)
     .setTitle("♟️ Echecs")
-    .setDescription(`\`\`\`\n${renderBoard(game.board)}\n\`\`\`\n${statusLine}`)
+    .setDescription(`${renderBoard(game.board)}\n\n${statusLine}`)
     .addFields(
       { name: "Blancs", value: `<@${game.players.w}>`, inline: true },
       { name: "Noirs", value: `<@${game.players.b}>`, inline: true },

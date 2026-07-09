@@ -180,19 +180,23 @@ export function allLegalMoves(board: Board, color: PieceColor): { from: Square; 
   return moves;
 }
 
-const WHITE_SYMBOLS: Record<PieceType, string> = { P: "P", N: "N", B: "B", R: "R", Q: "Q", K: "K" };
-const BLACK_SYMBOLS: Record<PieceType, string> = { P: "p", N: "n", B: "b", R: "r", Q: "q", K: "k" };
+const WHITE_SYMBOLS: Record<PieceType, string> = { P: "♙", N: "♘", B: "♗", R: "♖", Q: "♕", K: "♔" };
+const BLACK_SYMBOLS: Record<PieceType, string> = { P: "♟", N: "♞", B: "♝", R: "♜", Q: "♛", K: "♚" };
+const LIGHT_SQUARE = "⬜";
+const DARK_SQUARE = "🟫";
+const RANK_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"];
 
 export function renderBoard(board: Board): string {
-  const lines: string[] = ["  a b c d e f g h"];
+  const lines: string[] = [];
   for (let rank = 7; rank >= 0; rank--) {
     const row = board[rank]
-      .map((piece) => {
-        if (!piece) return ".";
-        return piece.color === "w" ? WHITE_SYMBOLS[piece.type] : BLACK_SYMBOLS[piece.type];
+      .map((piece, file) => {
+        if (piece) return piece.color === "w" ? WHITE_SYMBOLS[piece.type] : BLACK_SYMBOLS[piece.type];
+        return (rank + file) % 2 === 0 ? DARK_SQUARE : LIGHT_SQUARE;
       })
-      .join(" ");
-    lines.push(`${rank + 1} ${row}`);
+      .join("");
+    lines.push(`${RANK_EMOJI[rank]}${row}`);
   }
+  lines.push("　`a` `b` `c` `d` `e` `f` `g` `h`");
   return lines.join("\n");
 }

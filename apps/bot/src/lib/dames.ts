@@ -105,24 +105,33 @@ export function hasAnyLegalMove(board: CheckerBoard, color: CheckerColor): boole
   return false;
 }
 
+const LIGHT_SQUARE = "⬜";
+const DARK_SQUARE = "🟫";
+const WHITE_MAN = "⚪";
+const WHITE_KING = "🟠";
+const BLACK_MAN = "⚫";
+const BLACK_KING = "🟣";
+const RANK_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"];
+
 export function renderCheckerBoard(board: CheckerBoard): string {
-  const lines: string[] = ["  a b c d e f g h"];
+  const lines: string[] = [];
   for (let rank = 7; rank >= 0; rank--) {
     const row: string[] = [];
     for (let file = 0; file < 8; file++) {
       if ((file + rank) % 2 !== 0) {
-        row.push(" ");
+        row.push(LIGHT_SQUARE);
         continue;
       }
       const piece = board[rank][file];
       if (!piece) {
-        row.push(".");
+        row.push(DARK_SQUARE);
         continue;
       }
-      const ch = piece.color === "w" ? "w" : "b";
-      row.push(piece.king ? ch.toUpperCase() : ch);
+      if (piece.color === "w") row.push(piece.king ? WHITE_KING : WHITE_MAN);
+      else row.push(piece.king ? BLACK_KING : BLACK_MAN);
     }
-    lines.push(`${rank + 1} ${row.join(" ")}`);
+    lines.push(`${RANK_EMOJI[rank]}${row.join("")}`);
   }
+  lines.push("　`a` `b` `c` `d` `e` `f` `g` `h`");
   return lines.join("\n");
 }
