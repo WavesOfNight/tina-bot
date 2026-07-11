@@ -41,16 +41,23 @@ const WATCHTIME_INTERVAL_MS = 5 * 60_000;
 const WATCHTIME_MINUTES_PER_TICK = 5;
 const FOLLOW_SUB_CHECK_INTERVAL_MS = 60_000;
 
+function formatUnit(value: number, singular: string, plural: string): string {
+  return `${value} ${value > 1 ? plural : singular}`;
+}
+
+// Always shows at most the two biggest non-zero units (e.g. "2 ans, 14 jours"
+// instead of "2 ans, 14 jours, 6 heures, 32 minutes") for easier reading.
 function formatDuration(ms: number): string {
   const totalMinutes = Math.floor(ms / 60_000);
-  const days = Math.floor(totalMinutes / (60 * 24));
+  const years = Math.floor(totalMinutes / (60 * 24 * 365));
+  const days = Math.floor((totalMinutes % (60 * 24 * 365)) / (60 * 24));
   const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
   const minutes = totalMinutes % 60;
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days} jour${days > 1 ? "s" : ""}`);
-  if (hours > 0) parts.push(`${hours} heure${hours > 1 ? "s" : ""}`);
-  if (minutes > 0 || parts.length === 0) parts.push(`${minutes} minute${minutes > 1 ? "s" : ""}`);
-  return parts.join(", ");
+
+  if (years > 0) return `${formatUnit(years, "an", "ans")}, ${formatUnit(days, "jour", "jours")}`;
+  if (days > 0) return `${formatUnit(days, "jour", "jours")}, ${formatUnit(hours, "heure", "heures")}`;
+  if (hours > 0) return `${formatUnit(hours, "heure", "heures")}, ${formatUnit(minutes, "minute", "minutes")}`;
+  return formatUnit(minutes, "minute", "minutes");
 }
 
 interface Session {
