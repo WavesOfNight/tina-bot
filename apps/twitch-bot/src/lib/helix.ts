@@ -110,12 +110,17 @@ export async function getStreamStartedAt(ctx: HelixContext, broadcasterId: strin
   return startedAt ? new Date(startedAt) : null;
 }
 
-export async function getFollowedAt(ctx: HelixContext, broadcasterId: string, userId: string): Promise<Date | null> {
+export interface FollowCheckResult {
+  ok: boolean;
+  followedAt: Date | null;
+}
+
+export async function getFollowedAt(ctx: HelixContext, broadcasterId: string, userId: string): Promise<FollowCheckResult> {
   const res = await helixFetch(ctx, `/channels/followers?broadcaster_id=${broadcasterId}&user_id=${userId}`);
-  if (!res || !res.ok) return null;
+  if (!res || !res.ok) return { ok: false, followedAt: null };
   const data = (await res.json()) as { data: { followed_at: string }[] };
   const followedAt = data.data[0]?.followed_at;
-  return followedAt ? new Date(followedAt) : null;
+  return { ok: true, followedAt: followedAt ? new Date(followedAt) : null };
 }
 
 export interface RecentFollower {

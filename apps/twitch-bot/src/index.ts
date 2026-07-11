@@ -138,7 +138,7 @@ async function buildSession(
 
     if (lowerMessage === `${config.prefix}help`) {
       const customNames = await prisma.twitchCommand.findMany({ select: { name: true }, orderBy: { name: "asc" } });
-      const builtIns = ["discord", "dleaderboard", "leaderboard", "rank", "uptime", "followage"];
+      const builtIns = ["discord", "dleaderboard", "leaderboard", "rank", "uptime", "followage", "fc"];
       const custom = customNames.map((c) => c.name);
       const all = [...builtIns, ...custom].map((name) => `${config.prefix}${name}`).join(", ");
       await client.say(channelArg, `📖 Commandes disponibles : ${all}`).catch(() => null);
@@ -158,17 +158,20 @@ async function buildSession(
       return;
     }
 
-    if (lowerMessage === `${config.prefix}followage` && loginName) {
+    if ((lowerMessage === `${config.prefix}followage` || lowerMessage === `${config.prefix}fc`) && loginName) {
       const targetId = await getUserId(ctx, loginName).catch(() => null);
-      const followedAt = targetId ? await getFollowedAt(ctx, broadcasterId, targetId).catch(() => null) : null;
-      await client
-        .say(
-          channelArg,
-          followedAt
-            ? `@${author} tu suis la chaine depuis ${formatDuration(Date.now() - followedAt.getTime())} !`
-            : `@${author} tu ne suis pas encore la chaine !`,
-        )
-        .catch(() => null);
+      const result = targetId ? await getFollowedAt(ctx, broadcasterId, targetId).catch(() => null) : null;
+
+      let reply: string;
+      if (!targetId || !result || !result.ok) {
+        reply = `@${author} impossible de verifier ton abonnement pour le moment (le bot doit etre modo sur la chaine et autorise avec le bon scope Twitch).`;
+      } else if (result.followedAt) {
+        reply = `@${author} tu suis la chaine depuis ${formatDuration(Date.now() - result.followedAt.getTime())} !`;
+      } else {
+        reply = `@${author} tu ne suis pas encore la chaine !`;
+      }
+
+      await client.say(channelArg, reply).catch(() => null);
       return;
     }
 

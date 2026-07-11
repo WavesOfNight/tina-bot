@@ -1,21 +1,55 @@
 const INVITE_REGEX = /(discord\.gg\/|discord(?:app)?\.com\/invite\/)[a-zA-Z0-9-]+/i;
-const LINK_REGEX = /https?:\/\/\S+/i;
+
+const PROTOCOL_LINK_REGEX = /https?:\/\/\S+/gi;
+
+// Common TLDs used by spam/scam links. Bots almost never type "http(s)://" since
+// Twitch/Discord auto-linkify bare domains, so matching only the protocol form
+// (the old behavior) let every one of them through.
+const LINK_TLDS = [
+  "com", "net", "org", "gg", "tv", "io", "co", "me", "link", "xyz", "info", "biz",
+  "live", "stream", "gift", "club", "site", "online", "shop", "store", "app", "dev",
+  "gl", "ru", "cc", "top", "win", "bid", "click", "download", "monster", "fun", "icu",
+  "cf", "ga", "ml", "tk", "ws", "us", "uk", "de", "fr", "es", "it", "nl", "be", "ch",
+  "se", "no", "dk", "pl", "cz", "jp", "cn", "kr", "in", "br", "mx", "ca", "au", "nz",
+  "za", "to", "sh", "vip", "pro", "life", "world", "cam", "fyi", "page", "cloud",
+  "ly", "gd", "st", "im", "id", "so", "tc",
+];
+const BARE_DOMAIN_SOURCE = `\\b(?:www\\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.(?:${LINK_TLDS.join("|")})\\b(?:\\/\\S*)?`;
+const BARE_DOMAIN_REGEX = new RegExp(BARE_DOMAIN_SOURCE, "gi");
+
+// Undoes common "dot" obfuscation (spaced dots, "(dot)", "[.]", " dot ") before matching,
+// so e.g. "twitch . tv" or "discord (dot) gg" are still caught.
+function normalizeLinkObfuscation(content: string): string {
+  return content
+    .replace(/\s*[([]\s*dot\s*[)\]]\s*/gi, ".")
+    .replace(/\s+dot\s+/gi, ".")
+    .replace(/\s*[([]\s*\.\s*[)\]]\s*/g, ".")
+    .replace(/([a-z0-9])\s+\.\s+([a-z]{2,})/gi, "$1.$2");
+}
+
+function extractLinks(content: string): string[] {
+  const normalized = normalizeLinkObfuscation(content);
+  const protocolLinks = normalized.match(PROTOCOL_LINK_REGEX) ?? [];
+  const bareLinks = normalized.match(BARE_DOMAIN_REGEX) ?? [];
+  return [...protocolLinks, ...bareLinks];
+}
 
 export function matchesInvite(content: string): boolean {
-  return INVITE_REGEX.test(content);
+  return INVITE_REGEX.test(normalizeLinkObfuscation(content));
 }
 
 export function matchesLink(content: string): boolean {
-  return LINK_REGEX.test(content);
+  return extractLinks(content).length > 0;
 }
 
 export function matchesUnwhitelistedLink(content: string, whitelist: string[]): boolean {
-  if (!matchesLink(content)) return false;
+  const links = extractLinks(content);
+  if (links.length === 0) return false;
   if (whitelist.length === 0) return true;
-  const urls = content.match(/https?:\/\/\S+/gi) ?? [];
-  return urls.some((url) => {
+  return links.some((url) => {
     try {
-      const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+      const withProtocol = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+      const host = new URL(withProtocol).hostname.replace(/^www\./, "").toLowerCase();
       return !whitelist.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
     } catch {
       return true;
