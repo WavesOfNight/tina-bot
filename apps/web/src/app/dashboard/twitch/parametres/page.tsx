@@ -112,8 +112,15 @@ export default async function TwitchParametresPage({
         </div>
         <p className="text-xs text-lavender-500">
           Tina rejoint le chat Twitch avec un compte de bot (peut etre ton propre compte ou un compte dedie). Ce compte doit
-          etre modérateur du salon pour pouvoir supprimer des messages et faire des timeouts (tape{" "}
-          <code>/mod nomdubot</code> dans ton chat Twitch).
+          etre modérateur du salon pour pouvoir supprimer des messages, faire des timeouts et lire les dates de follow (pour{" "}
+          <code>!followage</code>/<code>!fc</code>) : connecte-toi avec ton compte principal sur Twitch et tape{" "}
+          <code>/mod nomdubot</code> dans ton propre chat.
+        </p>
+        <p className="mt-2 text-xs text-lavender-500">
+          Si le compte du bot est different de ton compte principal : deconnecte-toi de ton compte principal sur twitch.tv,
+          connecte-toi avec le compte du bot dans ton navigateur, <strong>puis seulement</strong> clique sur &quot;Se connecter
+          avec Twitch&quot; en bas de cette page - le token cree appartient au compte connecte dans le navigateur au moment du
+          clic, pas au nom que tu as tape dans le formulaire ci-dessous.
         </p>
       </div>
 
