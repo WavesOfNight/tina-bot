@@ -243,10 +243,19 @@ async function buildSession(
         }
       }
 
-      if (matchedReason && tags.id && loginName) {
-        await deleteChatMessage(ctx, broadcasterId, moderatorId, tags.id).catch((error) =>
-          console.error(`Échec de la suppression du message Twitch (id=${tags.id}, auteur=${loginName})`, error),
-        );
+      if (matchedReason) {
+        console.log(`Automod Twitch declenche (auteur=${loginName ?? "?"}, id=${tags.id ?? "?"}): ${matchedReason} - message: "${message}"`);
+
+        if (!tags.id || !loginName) {
+          console.error(`Automod Twitch: id de message ou auteur manquant, suppression/sanction impossible (id=${tags.id}, auteur=${loginName}).`);
+          return;
+        }
+
+        const deleted = await deleteChatMessage(ctx, broadcasterId, moderatorId, tags.id).catch((error) => {
+          console.error(`Échec de la suppression du message Twitch (id=${tags.id}, auteur=${loginName})`, error);
+          return false;
+        });
+        if (deleted) console.log(`Message Twitch supprime (id=${tags.id}, auteur=${loginName}).`);
 
         if (!shouldPunish) return;
 
