@@ -14,6 +14,7 @@ import pendu from "./games/pendu.js";
 import blackjack from "./games/blackjack.js";
 import echecs from "./games/echecs.js";
 import dames from "./games/dames.js";
+import loupgarou from "./games/loupgarou.js";
 import ban from "./moderation/ban.js";
 import kick from "./moderation/kick.js";
 import mute from "./moderation/mute.js";
@@ -61,6 +62,7 @@ export const commands: Command[] = [
   blackjack,
   echecs,
   dames,
+  loupgarou,
   ban,
   kick,
   mute,

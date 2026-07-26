@@ -16,7 +16,7 @@ const CATEGORIES = [
   },
   {
     name: "👥 Jeux en groupe",
-    value: "`/trivia` `/bombe` `/histoire` `/combattre` `/pendu`",
+    value: "`/trivia` `/bombe` `/histoire` `/combattre` `/pendu` `/loupgarou lancer` (partie vocale avec narrateur)",
   },
   {
     name: "🃏 Jeux solo",

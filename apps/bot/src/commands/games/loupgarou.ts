@@ -1,0 +1,101 @@
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import type { Command } from "../../types.js";
+import { games, createGame } from "../../lib/loupgarou-store.js";
+import { closeLobby, forceStopGame } from "../../lib/loupgarou-engine.js";
+
+const DEFAULT_MIN_PLAYERS = 5;
+const DEFAULT_LOBBY_SECONDS = 90;
+
+export function buildLobbyEmbed(hostId: string, playerCount: number, minPlayers: number) {
+  return new EmbedBuilder()
+    .setColor(0x8b0000)
+    .setTitle("🐺 Loup-Garou")
+    .setDescription(
+      `Une partie est organisee par <@${hostId}> !\n\nJoueurs inscrits : **${playerCount}** (minimum ${minPlayers})\n\nClique sur "Rejoindre" pour participer.`,
+    );
+}
+
+export function buildLobbyButtons(guildId: string) {
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(`loupgarou:join:${guildId}`).setLabel("Rejoindre").setEmoji("🐺").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`loupgarou:startnow:${guildId}`).setLabel("Demarrer maintenant").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`loupgarou:cancel:${guildId}`).setLabel("Annuler").setStyle(ButtonStyle.Danger),
+    ),
+  ];
+}
+
+const command: Command = {
+  data: new SlashCommandBuilder()
+    .setName("loupgarou")
+    .setDescription("Lance une partie de Loup-Garou en vocal")
+    .addSubcommand((sub) =>
+      sub
+        .setName("lancer")
+        .setDescription("Ouvre un lobby pour une nouvelle partie")
+        .addBooleanOption((opt) => opt.setName("voyante").setDescription("Inclure la Voyante (defaut: oui)"))
+        .addBooleanOption((opt) => opt.setName("sorciere").setDescription("Inclure la Sorciere (defaut: oui)"))
+        .addBooleanOption((opt) => opt.setName("chasseur").setDescription("Inclure le Chasseur (defaut: oui)"))
+        .addBooleanOption((opt) => opt.setName("cupidon").setDescription("Inclure Cupidon (defaut: oui)"))
+        .addIntegerOption((opt) => opt.setName("min_joueurs").setDescription("Minimum de joueurs (defaut: 5)").setMinValue(3).setMaxValue(30))
+        .addIntegerOption((opt) =>
+          opt.setName("duree_lobby").setDescription("Duree du lobby en secondes (defaut: 90)").setMinValue(20).setMaxValue(300),
+        ),
+    )
+    .addSubcommand((sub) => sub.setName("stop").setDescription("Arrete de force la partie en cours sur ce serveur")),
+  async execute(interaction) {
+    if (!interaction.guildId || !interaction.guild || !interaction.channelId) return;
+    const sub = interaction.options.getSubcommand();
+
+    if (sub === "stop") {
+      const game = games.get(interaction.guildId);
+      if (!game) {
+        await interaction.reply({ content: "Aucune partie de loup-garou en cours sur ce serveur.", ephemeral: true });
+        return;
+      }
+      const isHost = game.hostId === interaction.user.id;
+      const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ?? false;
+      if (!isHost && !isAdmin) {
+        await interaction.reply({ content: "Seul l'organisateur ou un administrateur peut arreter la partie.", ephemeral: true });
+        return;
+      }
+      await interaction.reply("🛑 Partie de loup-garou arretee, tout le monde est ramene au salon habituel.");
+      await forceStopGame(interaction.client, interaction.guild, game);
+      return;
+    }
+
+    // sub === "lancer"
+    if (games.has(interaction.guildId)) {
+      await interaction.reply({ content: "Une partie de loup-garou est deja en cours ou en lobby sur ce serveur.", ephemeral: true });
+      return;
+    }
+
+    const roleOptions = {
+      voyante: interaction.options.getBoolean("voyante") ?? true,
+      sorciere: interaction.options.getBoolean("sorciere") ?? true,
+      chasseur: interaction.options.getBoolean("chasseur") ?? true,
+      cupidon: interaction.options.getBoolean("cupidon") ?? true,
+    };
+    const minPlayers = interaction.options.getInteger("min_joueurs") ?? DEFAULT_MIN_PLAYERS;
+    const lobbySeconds = interaction.options.getInteger("duree_lobby") ?? DEFAULT_LOBBY_SECONDS;
+
+    const game = createGame(interaction.guildId, interaction.user.id, interaction.channelId, roleOptions, minPlayers);
+    game.lobbyPlayerIds.add(interaction.user.id);
+
+    await interaction.reply({
+      embeds: [buildLobbyEmbed(interaction.user.id, game.lobbyPlayerIds.size, minPlayers)],
+      components: buildLobbyButtons(interaction.guildId),
+    });
+    const reply = await interaction.fetchReply().catch(() => null);
+    game.lobbyMessageId = reply?.id ?? null;
+
+    const guild = interaction.guild;
+    const client = interaction.client;
+    const timeout = setTimeout(() => {
+      void closeLobby(client, guild, game);
+    }, lobbySeconds * 1000);
+    game.activeTimeouts.push(timeout);
+  },
+};
+
+export default command;

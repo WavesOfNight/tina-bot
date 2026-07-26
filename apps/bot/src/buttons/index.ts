@@ -12,6 +12,7 @@ import blackjack from "./blackjack.js";
 import ticket from "./ticket.js";
 import chess from "./chess.js";
 import dames from "./dames.js";
+import loupgarou from "./loupgarou.js";
 
 export const buttonHandlers: ButtonHandler[] = [
   morpion,
@@ -27,6 +28,7 @@ export const buttonHandlers: ButtonHandler[] = [
   ticket,
   chess,
   dames,
+  loupgarou,
 ];
 
 export const buttonHandlerMap = new Map(buttonHandlers.map((handler) => [handler.prefix, handler]));
