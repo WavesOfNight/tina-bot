@@ -43,6 +43,10 @@ export default async function TwitchModerationPage() {
 
       <form action={saveAutoModLevel} className="glass-panel mb-4 rounded-aero p-5 shadow-glass">
         <h2 className="mb-2 text-sm font-medium text-lavender-800">Filtre de mots automatique</h2>
+        <p className="mb-3 text-xs text-lavender-500">
+          Uniquement les mots interdits (insultes, etc.). N&apos;a aucun effet sur les liens, majuscules, emotes ou
+          repetitions - ces filtres se gerent independamment plus bas, dans &quot;Filtres de chat&quot;.
+        </p>
         <div className="mb-4 space-y-2">
           {AUTOMOD_LEVELS.map((level) => (
             <label key={level.value} className="flex items-start gap-2 rounded-xl border border-lavender-200 bg-white/60 p-3 text-sm">
