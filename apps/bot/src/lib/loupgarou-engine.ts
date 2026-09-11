@@ -7,6 +7,8 @@ import {
   alivePlayers,
   aliveWolves,
   isAlive,
+  isFakePlayer,
+  fakePlayerLabel,
   getPlayer,
   findByRole,
   loverOf,
@@ -37,8 +39,9 @@ function chunkRows(buttons: ButtonBuilder[]): ActionRowBuilder<ButtonBuilder>[] 
 async function playerButtons(guild: Guild, userIds: string[], prefix: string, style: ButtonStyle = ButtonStyle.Primary): Promise<ButtonBuilder[]> {
   const buttons: ButtonBuilder[] = [];
   for (const userId of userIds.slice(0, 24)) {
-    const member = await guild.members.fetch(userId).catch(() => null);
-    const label = (member?.displayName ?? "Joueur").slice(0, 80);
+    const label = isFakePlayer(userId)
+      ? fakePlayerLabel(userId)
+      : ((await guild.members.fetch(userId).catch(() => null))?.displayName ?? "Joueur").slice(0, 80);
     buttons.push(new ButtonBuilder().setCustomId(`${prefix}:${guild.id}:${userId}`).setLabel(label).setStyle(style));
   }
   return buttons;
@@ -64,6 +67,7 @@ async function bumpStat(guildId: string, userId: string, field: "wins" | "losses
 }
 
 async function displayName(guild: Guild, userId: string): Promise<string> {
+  if (isFakePlayer(userId)) return fakePlayerLabel(userId);
   const member = await guild.members.fetch(userId).catch(() => null);
   return member?.displayName ?? "un joueur";
 }
@@ -120,6 +124,7 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
   await grantWolfAccess(guild, channels.wolvesVoiceId, channels.wolvesTextId, wolfIds);
 
   for (const player of game.players.values()) {
+    if (isFakePlayer(player.userId)) continue;
     const member = await guild.members.fetch(player.userId).catch(() => null);
     const role = ROLES[player.role];
     await member
@@ -151,6 +156,16 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
 async function startCupidStep(client: Client, guild: Guild, game: LoupGarouGame): Promise<void> {
   const cupid = findByRole(game, "CUPIDON");
   if (!cupid) {
+    await beginNight(client, guild, game);
+    return;
+  }
+
+  if (isFakePlayer(cupid.userId)) {
+    const candidates = alivePlayers(game)
+      .filter((p) => p.userId !== cupid.userId)
+      .map((p) => p.userId)
+      .sort(() => Math.random() - 0.5);
+    if (candidates.length >= 2) game.lovers = [candidates[0], candidates[1]];
     await beginNight(client, guild, game);
     return;
   }
@@ -243,6 +258,16 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
     return;
   }
 
+  // Les faux loups (mode admintest) ne peuvent pas cliquer un bouton - ils votent
+  // aussitot pour une cible aleatoire.
+  for (const wolfId of wolves) {
+    if (isFakePlayer(wolfId)) game.wolfVotes.set(wolfId, targets[Math.floor(Math.random() * targets.length)]);
+  }
+  if (game.wolfVotes.size >= wolves.length) {
+    await resolveWolfVote(client, guild, game);
+    return;
+  }
+
   const wolvesChannel = await getTextChannel(guild, game.wolvesTextId);
   if (wolvesChannel) {
     await narrate(guild.id, wolvesChannel, "🐺 Loups-garous, choisissez votre victime :");
@@ -281,7 +306,7 @@ async function resolveWolfVote(client: Client, guild: Guild, game: LoupGarouGame
 
 async function runVoyanteStep(client: Client, guild: Guild, game: LoupGarouGame): Promise<void> {
   const voyante = findByRole(game, "VOYANTE");
-  if (!voyante) {
+  if (!voyante || isFakePlayer(voyante.userId)) {
     await advanceFromVoyante(client, guild, game);
     return;
   }
@@ -318,7 +343,7 @@ export async function advanceFromVoyante(client: Client, guild: Guild, game: Lou
 async function runSorciereStep(client: Client, guild: Guild, game: LoupGarouGame): Promise<void> {
   const sorciere = findByRole(game, "SORCIERE");
   const hasPotion = sorciere ? !game.witch.lifePotionUsed || !game.witch.deathPotionUsed : false;
-  if (!sorciere || !hasPotion) {
+  if (!sorciere || !hasPotion || isFakePlayer(sorciere.userId)) {
     await resolveNight(client, guild, game);
     return;
   }
@@ -440,6 +465,14 @@ async function promptChasseurRevenge(
   }
 
   game.pendingChasseurCallback = onComplete;
+
+  if (isFakePlayer(chasseurId)) {
+    // Le faux Chasseur ne peut pas cliquer - il tire (ou non) aussitot au hasard.
+    const targetId = Math.random() < 0.6 ? targets[Math.floor(Math.random() * targets.length)] : null;
+    await resolveChasseurShot(client, guild, game, targetId);
+    return;
+  }
+
   const member = await guild.members.fetch(chasseurId).catch(() => null);
   const buttons = await playerButtons(guild, targets, "loupgarou:chasseur", ButtonStyle.Danger);
   await member?.send({ content: "🏹 Tu es mort, mais avant de partir tu peux tirer sur quelqu'un !", components: chunkRows(buttons) }).catch(() => null);
@@ -488,8 +521,20 @@ async function runDayPhase(client: Client, guild: Guild, game: LoupGarouGame): P
   game.villageVotes.clear();
   game.phase = "DAY_VOTE";
 
-  const villageChannel = await getTextChannel(guild, game.channelId);
   const targets = alivePlayers(game).map((p) => p.userId);
+
+  // Les faux villageois (mode admintest) votent aussitot pour une cible aleatoire.
+  for (const userId of targets) {
+    if (!isFakePlayer(userId)) continue;
+    const choices = targets.filter((id) => id !== userId);
+    if (choices.length > 0) game.villageVotes.set(userId, choices[Math.floor(Math.random() * choices.length)]);
+  }
+  if (game.villageVotes.size >= targets.length) {
+    await resolveVillageVote(client, guild, game);
+    return;
+  }
+
+  const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) {
     await narrate(guild.id, villageChannel, "🗳️ Le village doit maintenant voter pour eliminer un suspect.");
     const buttons = await playerButtons(guild, targets, "loupgarou:villagevote", ButtonStyle.Danger);

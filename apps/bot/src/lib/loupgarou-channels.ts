@@ -1,4 +1,5 @@
 import { ChannelType, PermissionFlagsBits, type Guild, type OverwriteResolvable } from "discord.js";
+import { isFakePlayer } from "./loupgarou-store.js";
 
 export interface CreatedChannels {
   categoryId: string;
@@ -12,10 +13,14 @@ export async function setupChannels(guild: Guild, playerIds: string[]): Promise<
   const everyoneId = guild.roles.everyone.id;
   const botId = guild.members.me?.id;
 
-  const playerOverwrites: OverwriteResolvable[] = playerIds.map((id) => ({
-    id,
-    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
-  }));
+  // Les faux joueurs (mode /loupgarou admintest) n'existent pas cote Discord - impossible
+  // (et inutile) de leur creer une permission overwrite.
+  const playerOverwrites: OverwriteResolvable[] = playerIds
+    .filter((id) => !isFakePlayer(id))
+    .map((id) => ({
+      id,
+      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
+    }));
 
   const category = await guild.channels
     .create({
@@ -70,6 +75,7 @@ export async function grantWolfAccess(guild: Guild, wolvesVoiceId: string, wolve
   const textChannel = await guild.channels.fetch(wolvesTextId).catch(() => null);
 
   for (const userId of wolfUserIds) {
+    if (isFakePlayer(userId)) continue;
     if (voiceChannel?.isVoiceBased()) {
       await voiceChannel.permissionOverwrites.create(userId, { ViewChannel: true, Connect: true }).catch(() => null);
     }
@@ -81,6 +87,7 @@ export async function grantWolfAccess(guild: Guild, wolvesVoiceId: string, wolve
 
 export async function moveMembersToChannel(guild: Guild, userIds: string[], channelId: string | null): Promise<void> {
   for (const userId of userIds) {
+    if (isFakePlayer(userId)) continue;
     const member = await guild.members.fetch(userId).catch(() => null);
     if (!member?.voice.channelId) continue;
     await member.voice.setChannel(channelId).catch(() => null);

@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { Command } from "../../types.js";
-import { games, createGame } from "../../lib/loupgarou-store.js";
-import { closeLobby, forceStopGame } from "../../lib/loupgarou-engine.js";
+import { games, createGame, createFakePlayerIds } from "../../lib/loupgarou-store.js";
+import { closeLobby, forceStopGame, startGame } from "../../lib/loupgarou-engine.js";
 
 const DEFAULT_MIN_PLAYERS = 5;
 const DEFAULT_LOBBY_SECONDS = 90;
@@ -42,7 +42,19 @@ const command: Command = {
           opt.setName("duree_lobby").setDescription("Duree du lobby en secondes (defaut: 90)").setMinValue(20).setMaxValue(300),
         ),
     )
-    .addSubcommand((sub) => sub.setName("stop").setDescription("Arrete de force la partie en cours sur ce serveur")),
+    .addSubcommand((sub) => sub.setName("stop").setDescription("Arrete de force la partie en cours sur ce serveur"))
+    .addSubcommand((sub) =>
+      sub
+        .setName("admintest")
+        .setDescription("[Admin] Lance une partie de test avec de faux joueurs qui agissent tout seuls")
+        .addIntegerOption((opt) =>
+          opt.setName("joueurs").setDescription("Nombre total de joueurs simules, toi inclus (defaut: 6)").setMinValue(3).setMaxValue(20),
+        )
+        .addBooleanOption((opt) => opt.setName("voyante").setDescription("Inclure la Voyante (defaut: oui)"))
+        .addBooleanOption((opt) => opt.setName("sorciere").setDescription("Inclure la Sorciere (defaut: oui)"))
+        .addBooleanOption((opt) => opt.setName("chasseur").setDescription("Inclure le Chasseur (defaut: oui)"))
+        .addBooleanOption((opt) => opt.setName("cupidon").setDescription("Inclure Cupidon (defaut: oui)")),
+    ),
   async execute(interaction) {
     if (!interaction.guildId || !interaction.guild || !interaction.channelId) return;
     const sub = interaction.options.getSubcommand();
@@ -61,6 +73,36 @@ const command: Command = {
       }
       await interaction.reply("🛑 Partie de loup-garou arretee, tout le monde est ramene au salon habituel.");
       await forceStopGame(interaction.client, interaction.guild, game);
+      return;
+    }
+
+    if (sub === "admintest") {
+      if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+        await interaction.reply({ content: "Reserve aux administrateurs (permission Gerer le serveur).", ephemeral: true });
+        return;
+      }
+      if (games.has(interaction.guildId)) {
+        await interaction.reply({ content: "Une partie de loup-garou est deja en cours ou en lobby sur ce serveur.", ephemeral: true });
+        return;
+      }
+
+      const roleOptions = {
+        voyante: interaction.options.getBoolean("voyante") ?? true,
+        sorciere: interaction.options.getBoolean("sorciere") ?? true,
+        chasseur: interaction.options.getBoolean("chasseur") ?? true,
+        cupidon: interaction.options.getBoolean("cupidon") ?? true,
+      };
+      const totalPlayers = interaction.options.getInteger("joueurs") ?? 6;
+      const fakeCount = totalPlayers - 1;
+
+      const game = createGame(interaction.guildId, interaction.user.id, interaction.channelId, roleOptions, 1);
+      game.lobbyPlayerIds.add(interaction.user.id);
+      for (const fakeId of createFakePlayerIds(fakeCount)) game.lobbyPlayerIds.add(fakeId);
+
+      await interaction.reply(
+        `🧪 **Mode test admin** lance avec toi + ${fakeCount} joueur(s) fictif(s). Verifie tes messages prives pour ton role - les faux joueurs votent et agissent tout seuls, seules tes propres actions demandent un clic.`,
+      );
+      await startGame(interaction.client, interaction.guild, game);
       return;
     }
 

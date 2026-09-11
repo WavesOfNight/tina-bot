@@ -174,3 +174,21 @@ export function checkWinner(game: LoupGarouGame): Winner {
   if (wolves >= village) return "LOUPS";
   return null;
 }
+
+// Joueurs fictifs pour /loupgarou admintest - jamais un vrai ID Discord (les snowflakes
+// sont numeriques) donc aucune collision possible. Ils ne peuvent recevoir ni MP ni etre
+// deplaces en vocal ; toute action qui leur revient est auto-resolue par le moteur plutot
+// que d'attendre un clic qui ne viendra jamais.
+const FAKE_PLAYER_PREFIX = "fake-";
+
+export function isFakePlayer(userId: string): boolean {
+  return userId.startsWith(FAKE_PLAYER_PREFIX);
+}
+
+export function createFakePlayerIds(count: number): string[] {
+  return Array.from({ length: count }, (_, i) => `${FAKE_PLAYER_PREFIX}${i + 1}`);
+}
+
+export function fakePlayerLabel(userId: string): string {
+  return `Faux joueur ${userId.slice(FAKE_PLAYER_PREFIX.length)}`;
+}
