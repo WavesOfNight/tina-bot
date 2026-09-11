@@ -1,5 +1,6 @@
 import { prisma } from "./client.js";
 import { MAX_LEVEL, XP_COOLDOWN_MS, levelFromXp, rollGainedXp } from "./xp.js";
+import { getTwitchBotConfig } from "./twitch-bot-config.js";
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -70,9 +71,16 @@ export async function getTopTwitchChatters(limit = 10) {
   return prisma.twitchChatterStat.findMany({ orderBy: { messages: "desc" }, take: limit });
 }
 
+// La chaine et le compte du bot ne sont jamais des "chatteurs" a classer - on les exclut
+// toujours, meme s'ils accumulent de l'XP en tapant dans leur propre chat.
 export async function getTwitchLeaderboard(limit = 5) {
+  const config = await getTwitchBotConfig();
+  const excluded = [config?.channelName, config?.username]
+    .filter((name): name is string => Boolean(name))
+    .map((name) => name.toLowerCase());
+
   return prisma.twitchChatterStat.findMany({
-    where: { xp: { gt: 0 } },
+    where: { xp: { gt: 0 }, ...(excluded.length > 0 ? { username: { notIn: excluded } } : {}) },
     orderBy: [{ level: "desc" }, { xp: "desc" }],
     take: limit,
   });
