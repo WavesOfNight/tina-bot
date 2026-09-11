@@ -184,3 +184,12 @@ export function stopAllRadioSessions() {
     stopSession(guildId);
   }
 }
+
+// A utiliser quand un autre module (le narrateur du loup-garou) a pris la seule
+// connexion vocale possible pour cette guilde et l'a detruite lui-meme : la radio ne le
+// sait pas et penserait encore avoir une session active, donc syncRadioPlayback ne
+// tenterait jamais de la relancer. On oublie juste l'entree perimee (la vraie connexion
+// est deja fermee, pas la peine d'essayer de la detruire une seconde fois).
+export function invalidateRadioSession(guildId: string): void {
+  sessions.delete(guildId);
+}

@@ -20,6 +20,7 @@ import {
 } from "./loupgarou-store.js";
 import { setupChannels, grantWolfAccess, moveMembersToChannel, cleanupChannels, type CreatedChannels } from "./loupgarou-channels.js";
 import { joinNarratorChannel, narrate, leaveNarratorChannel } from "./loupgarou-voice.js";
+import { invalidateRadioSession, syncRadioPlayback } from "./radio.js";
 
 const WOLF_VOTE_MS = 45_000;
 const ROLE_ACTION_MS = 30_000;
@@ -135,6 +136,10 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
   }
 
   await moveMembersToChannel(guild, playerIds, channels.villageVoiceId);
+  // La radio (si elle jouait) va se faire voler sa seule connexion vocale possible pour
+  // cette guilde par le narrateur ci-dessous - on efface sa trace perimee tout de suite
+  // pour qu'elle sache qu'il faudra se reconnecter a la fin de la partie.
+  invalidateRadioSession(guild.id);
   await joinNarratorChannel(client, guild.id, channels.villageVoiceId);
 
   const actionsChannel = await getTextChannel(guild, channels.actionsTextId);
@@ -637,9 +642,18 @@ async function cleanupGame(client: Client, guild: Guild, game: LoupGarouGame): P
     }
     createdChannelsByGuild.delete(guild.id);
     await cleanupChannels(guild, channels);
+
+    leaveNarratorChannel(guild.id);
+    // La radio pensait toujours avoir une session active dans ce salon (perimee depuis
+    // que le narrateur a pris sa connexion) - on l'efface et on relance la verification
+    // tout de suite pour que la radio reprenne sans attendre le prochain cycle (jusqu'a
+    // 15s) si elle est configuree sur cette guilde.
+    invalidateRadioSession(guild.id);
+    await syncRadioPlayback(client).catch((error) => console.error("Echec de la reprise de la radio apres la partie de loup-garou", error));
+  } else {
+    leaveNarratorChannel(guild.id);
   }
 
-  leaveNarratorChannel(guild.id);
   endGame(guild.id);
 }
 
