@@ -26,8 +26,6 @@ const LOW_EN = [
   "nigga",
   "faggot",
   "faggy",
-  "retard",
-  "retarded",
   "kike",
   "chink",
   "spic",
