@@ -157,11 +157,27 @@ async function startSession(client: Client, guildId: string, channelId: string):
   }
 }
 
+// Guildes ou un autre module (le narrateur du loup-garou) a la main sur la seule
+// connexion vocale possible - la radio doit s'abstenir totalement, y compris ne pas se
+// reconnecter au prochain cycle si elle detecte "aucune session active" entre-temps.
+const suspendedGuilds = new Set<string>();
+
+export function suspendRadioForGuild(guildId: string): void {
+  suspendedGuilds.add(guildId);
+  stopSession(guildId);
+}
+
+export function resumeRadioForGuild(guildId: string): void {
+  suspendedGuilds.delete(guildId);
+}
+
 export async function syncRadioPlayback(client: Client) {
   const guilds = await prisma.guild.findMany({
     where: { radioEnabled: true, radioChannelId: { not: null } },
   });
-  const desired = new Map(guilds.map((g) => [g.id, g.radioChannelId as string]));
+  const desired = new Map(
+    guilds.filter((g) => !suspendedGuilds.has(g.id)).map((g) => [g.id, g.radioChannelId as string]),
+  );
 
   for (const [guildId, session] of sessions) {
     const wantedChannel = desired.get(guildId);
@@ -185,11 +201,3 @@ export function stopAllRadioSessions() {
   }
 }
 
-// A utiliser quand un autre module (le narrateur du loup-garou) a pris la seule
-// connexion vocale possible pour cette guilde et l'a detruite lui-meme : la radio ne le
-// sait pas et penserait encore avoir une session active, donc syncRadioPlayback ne
-// tenterait jamais de la relancer. On oublie juste l'entree perimee (la vraie connexion
-// est deja fermee, pas la peine d'essayer de la detruire une seconde fois).
-export function invalidateRadioSession(guildId: string): void {
-  sessions.delete(guildId);
-}

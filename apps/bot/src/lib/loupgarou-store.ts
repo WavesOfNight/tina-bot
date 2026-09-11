@@ -29,7 +29,6 @@ export interface LoupGarouGame {
   channelId: string;
   categoryId: string | null;
   villageVoiceId: string | null;
-  wolvesVoiceId: string | null;
   wolvesTextId: string | null;
   lobbyPlayerIds: Set<string>;
   minPlayers: number;
@@ -67,7 +66,6 @@ export function createGame(
     channelId,
     categoryId: null,
     villageVoiceId: null,
-    wolvesVoiceId: null,
     wolvesTextId: null,
     lobbyPlayerIds: new Set(),
     minPlayers,

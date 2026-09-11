@@ -19,8 +19,8 @@ import {
   endGame,
 } from "./loupgarou-store.js";
 import { setupChannels, grantWolfAccess, moveMembersToChannel, cleanupChannels, type CreatedChannels } from "./loupgarou-channels.js";
-import { joinNarratorChannel, narrate, leaveNarratorChannel } from "./loupgarou-voice.js";
-import { invalidateRadioSession, syncRadioPlayback } from "./radio.js";
+import { joinNarratorChannel, narrate, leaveNarratorChannel, playSoundEffect } from "./loupgarou-voice.js";
+import { suspendRadioForGuild, resumeRadioForGuild, syncRadioPlayback } from "./radio.js";
 
 const WOLF_VOTE_MS = 45_000;
 const ROLE_ACTION_MS = 30_000;
@@ -112,7 +112,6 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
   createdChannelsByGuild.set(game.guildId, channels);
   game.categoryId = channels.categoryId;
   game.villageVoiceId = channels.villageVoiceId;
-  game.wolvesVoiceId = channels.wolvesVoiceId;
   game.wolvesTextId = channels.wolvesTextId;
   game.channelId = channels.actionsTextId;
 
@@ -122,7 +121,7 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
   const wolfIds = alivePlayers(game)
     .filter((p) => p.role === "LOUP_GAROU")
     .map((p) => p.userId);
-  await grantWolfAccess(guild, channels.wolvesVoiceId, channels.wolvesTextId, wolfIds);
+  await grantWolfAccess(guild, channels.wolvesTextId, wolfIds);
 
   for (const player of game.players.values()) {
     if (isFakePlayer(player.userId)) continue;
@@ -136,10 +135,11 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
   }
 
   await moveMembersToChannel(guild, playerIds, channels.villageVoiceId);
-  // La radio (si elle jouait) va se faire voler sa seule connexion vocale possible pour
-  // cette guilde par le narrateur ci-dessous - on efface sa trace perimee tout de suite
-  // pour qu'elle sache qu'il faudra se reconnecter a la fin de la partie.
-  invalidateRadioSession(guild.id);
+  // La radio (si elle jouait) partage la seule connexion vocale possible pour cette
+  // guilde avec le narrateur - on la met en pause pour toute la duree de la partie, pas
+  // seulement au demarrage, sinon son propre cycle de verification periodique (toutes
+  // les 15s) la reconnecterait de force en pleine partie des qu'il la croit arretee.
+  suspendRadioForGuild(guild.id);
   await joinNarratorChannel(client, guild.id, channels.villageVoiceId);
 
   const actionsChannel = await getTextChannel(guild, channels.actionsTextId);
@@ -247,12 +247,12 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
 
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) await narrate(guild.id, villageChannel, `🌙 **Nuit ${game.nightNumber}** - Le village s'endort...`);
+  await playSoundEffect(guild.id, "night");
 
+  // Tout le monde reste dans le meme salon vocal toute la partie, y compris les loups :
+  // les deplacer vers un salon prive reviendrait a reveler publiquement qui ils sont des
+  // qu'ils disparaissent du salon commun. Leur vote reste prive via le salon texte cache.
   const wolves = aliveWolves(game).map((p) => p.userId);
-  if (game.wolvesVoiceId) {
-    await moveMembersToChannel(guild, wolves, game.wolvesVoiceId);
-    await joinNarratorChannel(client, guild.id, game.wolvesVoiceId);
-  }
 
   const targets = alivePlayers(game)
     .filter((p) => p.role !== "LOUP_GAROU")
@@ -426,16 +426,15 @@ async function announceDeathsAndContinue(
 
   if (dead.length === 0) {
     if (villageChannel) await narrate(guild.id, villageChannel, "☀️ Le village se reveille... et personne n'est mort cette nuit !");
+    await playSoundEffect(guild.id, "dawn");
   } else {
     const names = await Promise.all(dead.map((id) => displayName(guild, id)));
     if (villageChannel) {
       await narrate(guild.id, villageChannel, `☀️ Le village se reveille... ${names.join(", ")} ${names.length > 1 ? "sont morts" : "est mort"} cette nuit.`);
     }
+    await playSoundEffect(guild.id, "death");
+    await playSoundEffect(guild.id, "dawn");
   }
-
-  const stillAlive = alivePlayers(game).map((p) => p.userId);
-  await moveMembersToChannel(guild, stillAlive, game.villageVoiceId);
-  if (game.villageVoiceId) await joinNarratorChannel(client, guild.id, game.villageVoiceId);
 
   const winner = checkWinner(game);
   if (winner) {
@@ -500,6 +499,7 @@ async function resolveChasseurShot(client: Client, guild: Guild, game: LoupGarou
     if (dead.length > 0 && villageChannel) {
       const names = await Promise.all(dead.map((id) => displayName(guild, id)));
       await narrate(guild.id, villageChannel, `🏹 Le Chasseur tire sur ${names.join(", ")} en tombant !`);
+      await playSoundEffect(guild.id, "death");
     }
 
     const winner = checkWinner(game);
@@ -577,6 +577,7 @@ async function resolveVillageVote(client: Client, guild: Guild, game: LoupGarouG
   const dead = applyDeaths(game, [eliminated]);
   const names = await Promise.all(dead.map((id) => displayName(guild, id)));
   if (villageChannel) await narrate(guild.id, villageChannel, `⚖️ Le village a vote. ${names.join(", ")} ${names.length > 1 ? "sont elimines" : "est elimine"}.`);
+  await playSoundEffect(guild.id, "death");
 
   const winner = checkWinner(game);
   if (winner) {
@@ -644,11 +645,10 @@ async function cleanupGame(client: Client, guild: Guild, game: LoupGarouGame): P
     await cleanupChannels(guild, channels);
 
     leaveNarratorChannel(guild.id);
-    // La radio pensait toujours avoir une session active dans ce salon (perimee depuis
-    // que le narrateur a pris sa connexion) - on l'efface et on relance la verification
-    // tout de suite pour que la radio reprenne sans attendre le prochain cycle (jusqu'a
-    // 15s) si elle est configuree sur cette guilde.
-    invalidateRadioSession(guild.id);
+    // Leve la pause et relance la verification tout de suite (plutot que d'attendre
+    // jusqu'a 15s le prochain cycle naturel) pour que la radio reprenne sans delai si
+    // elle est configuree sur cette guilde.
+    resumeRadioForGuild(guild.id);
     await syncRadioPlayback(client).catch((error) => console.error("Echec de la reprise de la radio apres la partie de loup-garou", error));
   } else {
     leaveNarratorChannel(guild.id);

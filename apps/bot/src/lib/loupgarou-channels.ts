@@ -4,7 +4,6 @@ import { isFakePlayer } from "./loupgarou-store.js";
 export interface CreatedChannels {
   categoryId: string;
   villageVoiceId: string;
-  wolvesVoiceId: string;
   wolvesTextId: string;
   actionsTextId: string;
 }
@@ -35,16 +34,11 @@ export async function setupChannels(guild: Guild, playerIds: string[]): Promise<
     .catch(() => null);
   if (!category) return null;
 
+  // Un seul salon vocal pour toute la partie : personne n'est jamais deplace pendant la
+  // nuit, sinon voir les loups disparaitre du salon commun reveille instantanement qui
+  // ils sont. Leur vote reste prive via un salon TEXTE cache, sans equivalent vocal.
   const villageVoice = await guild.channels.create({ name: "🏘️ Village", type: ChannelType.GuildVoice, parent: category.id }).catch(() => null);
   const actionsText = await guild.channels.create({ name: "loup-garou", type: ChannelType.GuildText, parent: category.id }).catch(() => null);
-  const wolvesVoice = await guild.channels
-    .create({
-      name: "🐺 Loups-Garous",
-      type: ChannelType.GuildVoice,
-      parent: category.id,
-      permissionOverwrites: [{ id: everyoneId, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] }],
-    })
-    .catch(() => null);
   const wolvesText = await guild.channels
     .create({
       name: "loups-garous",
@@ -54,7 +48,7 @@ export async function setupChannels(guild: Guild, playerIds: string[]): Promise<
     })
     .catch(() => null);
 
-  if (!villageVoice || !actionsText || !wolvesVoice || !wolvesText) {
+  if (!villageVoice || !actionsText || !wolvesText) {
     await category.delete().catch(() => null);
     return null;
   }
@@ -62,23 +56,18 @@ export async function setupChannels(guild: Guild, playerIds: string[]): Promise<
   return {
     categoryId: category.id,
     villageVoiceId: villageVoice.id,
-    wolvesVoiceId: wolvesVoice.id,
     wolvesTextId: wolvesText.id,
     actionsTextId: actionsText.id,
   };
 }
 
-// Autorise uniquement les loups a voir/rejoindre leurs salons prives (les autres joueurs
-// restent explicitement exclus meme s'ils ont acces a la categorie).
-export async function grantWolfAccess(guild: Guild, wolvesVoiceId: string, wolvesTextId: string, wolfUserIds: string[]): Promise<void> {
-  const voiceChannel = await guild.channels.fetch(wolvesVoiceId).catch(() => null);
+// Autorise uniquement les loups a voir/ecrire dans leur salon texte prive (les autres
+// joueurs restent explicitement exclus meme s'ils ont acces a la categorie).
+export async function grantWolfAccess(guild: Guild, wolvesTextId: string, wolfUserIds: string[]): Promise<void> {
   const textChannel = await guild.channels.fetch(wolvesTextId).catch(() => null);
 
   for (const userId of wolfUserIds) {
     if (isFakePlayer(userId)) continue;
-    if (voiceChannel?.isVoiceBased()) {
-      await voiceChannel.permissionOverwrites.create(userId, { ViewChannel: true, Connect: true }).catch(() => null);
-    }
     if (textChannel?.type === ChannelType.GuildText) {
       await textChannel.permissionOverwrites.create(userId, { ViewChannel: true, SendMessages: true }).catch(() => null);
     }
@@ -95,7 +84,7 @@ export async function moveMembersToChannel(guild: Guild, userIds: string[], chan
 }
 
 export async function cleanupChannels(guild: Guild, channels: CreatedChannels): Promise<void> {
-  const ids = [channels.wolvesVoiceId, channels.wolvesTextId, channels.villageVoiceId, channels.actionsTextId, channels.categoryId];
+  const ids = [channels.wolvesTextId, channels.villageVoiceId, channels.actionsTextId, channels.categoryId];
   for (const id of ids) {
     const channel = await guild.channels.fetch(id).catch(() => null);
     await channel?.delete().catch(() => null);

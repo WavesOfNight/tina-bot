@@ -3,6 +3,7 @@ import {
   NoSubscriberBehavior,
   VoiceConnectionStatus,
   createAudioPlayer,
+  createAudioResource,
   entersState,
   joinVoiceChannel,
   type AudioPlayer,
@@ -10,7 +11,19 @@ import {
   type VoiceConnection,
 } from "@discordjs/voice";
 import type { Client, GuildTextBasedChannel } from "discord.js";
+import { fileURLToPath } from "node:url";
 import { synthesizeSpeech } from "./tts.js";
+
+// Sources : Field_cricket_unedited.ogg (Thatcher, CC BY-SA 3.0, Wikimedia Commons),
+// Medium_rooster_crowing.ogg (alys, domaine public, Wikimedia Commons), knife-blade-3
+// (BigSoundBank, CC0).
+const SOUND_EFFECTS = {
+  night: fileURLToPath(new URL("../../assets/sfx/night-cricket.ogg", import.meta.url)),
+  dawn: fileURLToPath(new URL("../../assets/sfx/dawn-rooster.ogg", import.meta.url)),
+  death: fileURLToPath(new URL("../../assets/sfx/death-knife.mp3", import.meta.url)),
+} as const;
+
+export type SoundEffect = keyof typeof SOUND_EFFECTS;
 
 interface NarratorSession {
   connection: VoiceConnection;
@@ -92,6 +105,20 @@ export async function say(guildId: string, text: string): Promise<void> {
 export async function narrate(guildId: string, textChannel: GuildTextBasedChannel, text: string): Promise<void> {
   await textChannel.send(text).catch(() => null);
   await say(guildId, text);
+}
+
+// Joue un petit effet sonore d'ambiance (best-effort, comme say()). Fichiers locaux geres
+// nativement par @discordjs/voice (transcodage ffmpeg automatique), pas besoin du pipeline
+// TTS.
+export async function playSoundEffect(guildId: string, effect: SoundEffect): Promise<void> {
+  const session = sessions.get(guildId);
+  if (!session) return;
+  try {
+    const resource = createAudioResource(SOUND_EFFECTS[effect]);
+    await playAndWait(session.player, resource);
+  } catch (error) {
+    console.error(`Echec de la lecture de l'effet sonore "${effect}" (guilde ${guildId})`, error);
+  }
 }
 
 export function leaveNarratorChannel(guildId: string): void {
