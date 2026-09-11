@@ -14,8 +14,15 @@ async function getAppAccessToken(clientId: string, clientSecret: string): Promis
     grant_type: "client_credentials",
   });
 
-  const res = await fetch(`https://id.twitch.tv/oauth2/token?${params.toString()}`, { method: "POST" }).catch(() => null);
-  if (!res || !res.ok) return null;
+  const res = await fetch(`https://id.twitch.tv/oauth2/token?${params.toString()}`, { method: "POST" }).catch((error) => {
+    console.error("Alertes Twitch : impossible de contacter id.twitch.tv pour obtenir un token d'application", error);
+    return null;
+  });
+  if (!res || !res.ok) {
+    const body = await res?.text().catch(() => "");
+    console.error(`Alertes Twitch : echec de l'obtention du token d'application (status ${res?.status ?? "?"}) - ${body}`);
+    return null;
+  }
 
   const data = (await res.json()) as { access_token: string; expires_in: number };
   cachedToken = { accessToken: data.access_token, expiresAt: Date.now() + (data.expires_in - 60) * 1000 };
@@ -37,14 +44,21 @@ export async function fetchLiveStream(clientId: string, clientSecret: string, us
   const res = await fetch(`https://api.twitch.tv/helix/streams?user_login=${encodeURIComponent(userLogin)}`, {
     headers: { "Client-Id": clientId, Authorization: `Bearer ${token}` },
     cache: "no-store",
-  }).catch(() => null);
-  if (!res || !res.ok) return null;
+  }).catch((error) => {
+    console.error(`Alertes Twitch : impossible de contacter l'API Helix pour ${userLogin}`, error);
+    return null;
+  });
+  if (!res || !res.ok) {
+    const body = await res?.text().catch(() => "");
+    console.error(`Alertes Twitch : echec de la requete /streams pour ${userLogin} (status ${res?.status ?? "?"}) - ${body}`);
+    return null;
+  }
 
   const data = (await res.json()) as {
     data: { id: string; title: string; game_name: string; thumbnail_url: string; user_login: string }[];
   };
   const stream = data.data[0];
-  if (!stream) return null;
+  if (!stream) return null; // pas en direct - pas une erreur
 
   return {
     streamId: stream.id,
