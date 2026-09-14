@@ -27,6 +27,15 @@ const CATEGORIES = [
     value: "`/rank` `/leaderboard`",
   },
   {
+    name: "💰 Economie",
+    value: "`/balance` `/pay` `/classement-pieces`",
+  },
+  {
+    name: "🔊 Salons Vocaux",
+    value:
+      "`/creer-vocal` — cree ton propre salon (limite de places, description, acces reserve a certains membres). Si le serveur a un salon “rejoindre pour creer”, ca marche aussi automatiquement rien qu'en le rejoignant !",
+  },
+  {
     name: "🛡️ Moderation",
     value: "`/warn` `/warnings` `/mute` `/unmute` `/kick` `/ban` `/unban` `/clear` `/slowmode` `/nickname` `/say`",
   },

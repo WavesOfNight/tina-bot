@@ -45,6 +45,7 @@ import invite from "./utility/invite.js";
 import balance from "./economy/balance.js";
 import pay from "./economy/pay.js";
 import classementPieces from "./economy/classement-pieces.js";
+import creerVocal from "./voice/creer-vocal.js";
 
 export const commands: Command[] = [
   hello,
@@ -93,6 +94,7 @@ export const commands: Command[] = [
   balance,
   pay,
   classementPieces,
+  creerVocal,
 ];
 
 export const commandMap = new Map(commands.map((command) => [command.data.name, command]));
