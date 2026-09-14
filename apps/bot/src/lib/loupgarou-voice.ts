@@ -194,22 +194,27 @@ export function setAmbiance(guildId: string, ambiance: Ambiance): void {
 }
 
 // Joue la ligne en voix (best-effort, n'echoue jamais) - a utiliser seulement apres
-// joinNarratorChannel(). Si la synthese ou la lecture echoue, se resout quand meme
-// pour ne jamais bloquer la progression de la partie.
-export async function say(guildId: string, text: string): Promise<void> {
+// joinNarratorChannel(). Si la synthese ou la lecture echoue, se resout quand meme pour
+// ne jamais bloquer la progression de la partie. Renvoie si la ligne a reellement ete
+// parlee (utilise par narrate() pour compenser par une pause quand ce n'est pas le cas -
+// pas seulement quand la voix entiere est indisponible, mais aussi un echec ponctuel de
+// synthese sur cette seule ligne).
+export async function say(guildId: string, text: string): Promise<boolean> {
   const session = sessions.get(guildId);
   if (!session) {
     console.log(`[loupgarou-voice] ligne non parlee, pas de session vocale active (guilde ${guildId}) : "${text}"`);
-    return;
+    return false;
   }
   const spoken = stripForSpeech(text);
-  if (!spoken) return;
+  if (!spoken) return false;
   try {
     const backgroundPath = session.ambiance ? AMBIANCES[session.ambiance] : undefined;
     const resource = await synthesizeSpeech(spoken, undefined, backgroundPath, currentAmbianceOffset(session));
     await playAndWait(session.player, resource);
+    return true;
   } catch (error) {
     console.error(`Echec de la synthese vocale (guilde ${guildId})`, error);
+    return false;
   } finally {
     // La ligne est terminee (ou a echoue) - la musique doit continuer plutot que de
     // s'arreter net avec elle.
@@ -217,10 +222,24 @@ export async function say(guildId: string, text: string): Promise<void> {
   }
 }
 
+// En temps normal, la duree de lecture TTS d'une ligne sert deja de rythme naturel entre
+// deux annonces. Si say() n'a rien pu jouer (pas de session, ligne vide, echec ponctuel de
+// synthese...), rien ne remplace ce temps et le texte defile d'un coup - illisible. Cette
+// pause de secours (proportionnelle a la longueur du texte, comme une vitesse de lecture
+// approximative) ne se declenche donc QUE dans ce cas precis.
+const FALLBACK_PAUSE_MS_PER_CHAR = 60;
+const FALLBACK_PAUSE_MIN_MS = 1500;
+const FALLBACK_PAUSE_MAX_MS = 6000;
+
+function fallbackPauseDuration(text: string): number {
+  return Math.min(FALLBACK_PAUSE_MAX_MS, Math.max(FALLBACK_PAUSE_MIN_MS, text.length * FALLBACK_PAUSE_MS_PER_CHAR));
+}
+
 // Poste toujours le texte dans le salon (source de verite), et tente en plus la voix.
 export async function narrate(guildId: string, textChannel: GuildTextBasedChannel, text: string): Promise<void> {
   await textChannel.send(text).catch(() => null);
-  await say(guildId, text);
+  const spoke = await say(guildId, text);
+  if (!spoke) await new Promise((resolve) => setTimeout(resolve, fallbackPauseDuration(text)));
 }
 
 // Joue un petit effet sonore ponctuel (best-effort, comme say()). Si une ambiance est
