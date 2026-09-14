@@ -88,6 +88,13 @@ function currentAmbianceOffset(session: NarratorSession): number {
 
 const sessions = new Map<string, NarratorSession>();
 
+// Permet a l'appelant (loupgarou-engine.ts) de savoir si la narration vocale a reussi a
+// se connecter, pour avertir les joueurs et compenser par des pauses texte si ce n'est
+// pas le cas plutot que de laisser la partie s'enchainer silencieusement d'un coup.
+export function isNarratorActive(guildId: string): boolean {
+  return sessions.has(guildId);
+}
+
 export async function joinNarratorChannel(client: Client, guildId: string, channelId: string): Promise<boolean> {
   const existing = sessions.get(guildId);
   if (existing && existing.channelId === channelId) return true;

@@ -29,7 +29,7 @@ import {
   cleanupChannels,
   type CreatedChannels,
 } from "./loupgarou-channels.js";
-import { joinNarratorChannel, narrate, leaveNarratorChannel, playSoundEffect, setAmbiance } from "./loupgarou-voice.js";
+import { joinNarratorChannel, narrate, leaveNarratorChannel, playSoundEffect, setAmbiance, isNarratorActive } from "./loupgarou-voice.js";
 import { suspendRadioForGuild, resumeRadioForGuild, syncRadioPlayback } from "./radio.js";
 
 const WOLF_VOTE_MS = 45_000;
@@ -96,6 +96,15 @@ function scheduleTimeout(game: LoupGarouGame, fn: () => void, ms: number): void 
 // juste un delai simple.
 function pause(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Quand la narration vocale tourne, le temps que prend chaque ligne a etre parlee sert
+// deja de rythme naturel entre deux annonces. Si la voix n'a pas pu se connecter, rien ne
+// vient remplacer ce temps - la partie s'enchainait alors d'un coup, illisible en texte
+// seul. Ce petit delai ne s'applique que dans ce cas precis (aucun effet quand la voix
+// fonctionne, pour ne pas ralentir une partie deja rythmee par le TTS).
+async function pauseIfSilent(guildId: string, ms: number): Promise<void> {
+  if (!isNarratorActive(guildId)) await pause(ms);
 }
 
 async function bumpStat(guildId: string, userId: string, field: "wins" | "losses"): Promise<void> {
@@ -193,9 +202,22 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
   // seulement au demarrage, sinon son propre cycle de verification periodique (toutes
   // les 15s) la reconnecterait de force en pleine partie des qu'il la croit arretee.
   suspendRadioForGuild(guild.id);
-  await joinNarratorChannel(client, guild.id, channels.villageVoiceId);
+  let voiceJoined = await joinNarratorChannel(client, guild.id, channels.villageVoiceId);
+  if (!voiceJoined) {
+    // La connexion vocale peut echouer ponctuellement (probleme reseau/Discord passager)
+    // - un second essai suffit generalement. Si ca echoue encore, la partie continue en
+    // texte seul plutot que de bloquer, mais les joueurs sont prevenus au lieu de se
+    // demander pourquoi Tina reste muette (voir pauseIfSilent plus bas).
+    await pause(2000);
+    voiceJoined = await joinNarratorChannel(client, guild.id, channels.villageVoiceId);
+  }
 
   const actionsChannel = await getTextChannel(guild, channels.actionsTextId);
+  if (!voiceJoined) {
+    await actionsChannel
+      ?.send("⚠️ Impossible de rejoindre le vocal pour la narration - la partie continue en texte uniquement dans ce salon.")
+      .catch(() => null);
+  }
   if (actionsChannel) {
     await narrate(
       guild.id,
@@ -220,6 +242,7 @@ async function startCupidStep(client: Client, guild: Guild, game: LoupGarouGame)
 
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) await narrate(guild.id, villageChannel, "💘 Cupidon se réveille et choisit en secret deux amoureux...");
+  await pauseIfSilent(guild.id, 3000);
 
   if (isFakePlayer(cupid.userId)) {
     const candidates = alivePlayers(game)
@@ -332,6 +355,7 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
   if (game.phase !== "NIGHT_WOLF_VOTE") return; // la partie a pu se terminer pendant la pause
 
   if (villageChannel) await narrate(guild.id, villageChannel, "🐺 Les Loups-Garous se réveillent et choisissent une victime...");
+  await pauseIfSilent(guild.id, 3000);
 
   // Tout le monde reste dans le meme salon vocal toute la partie, y compris les loups :
   // les deplacer vers un salon prive reviendrait a reveler publiquement qui ils sont des
@@ -402,6 +426,7 @@ async function runVoyanteStep(client: Client, guild: Guild, game: LoupGarouGame)
   await playSoundEffect(guild.id, "voyante");
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) await narrate(guild.id, villageChannel, "🔮 La Voyante se réveille et sonde un villageois...");
+  await pauseIfSilent(guild.id, 3000);
 
   if (isFakePlayer(voyante.userId)) {
     await advanceFromVoyante(client, guild, game);
@@ -452,6 +477,7 @@ async function runSorciereStep(client: Client, guild: Guild, game: LoupGarouGame
   await playSoundEffect(guild.id, "sorciere");
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) await narrate(guild.id, villageChannel, "🧪 La Sorcière se réveille...");
+  await pauseIfSilent(guild.id, 3000);
 
   if (isFakePlayer(sorciere.userId)) {
     await resolveNight(client, guild, game);
@@ -546,6 +572,8 @@ async function announceDeathsAndContinue(
       await narrate(guild.id, villageChannel, `☀️ Le village se réveille... ${names.join(", ")} ${names.length > 1 ? "sont morts" : "est mort"} cette nuit.`);
     }
   }
+
+  await pauseIfSilent(guild.id, 3000);
 
   const winner = checkWinner(game);
   if (winner) {
