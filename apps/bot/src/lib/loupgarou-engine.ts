@@ -25,6 +25,7 @@ import { suspendRadioForGuild, resumeRadioForGuild, syncRadioPlayback } from "./
 const WOLF_VOTE_MS = 45_000;
 const ROLE_ACTION_MS = 30_000;
 const VILLAGE_VOTE_MS = 60_000;
+const DISCUSSION_MS = 20_000;
 
 const createdChannelsByGuild = new Map<string, CreatedChannels>();
 
@@ -56,6 +57,13 @@ async function getTextChannel(guild: Guild, channelId: string | null) {
 
 function scheduleTimeout(game: LoupGarouGame, fn: () => void, ms: number): void {
   game.activeTimeouts.push(setTimeout(fn, ms));
+}
+
+// Petite pause entre deux temps forts pour laisser respirer la partie ("un truc chill",
+// pas un enchainement instantane) - pas liee au jeu (pas de timeout de partie a nettoyer),
+// juste un delai simple.
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function bumpStat(guildId: string, userId: string, field: "wins" | "losses"): Promise<void> {
@@ -164,14 +172,18 @@ async function startCupidStep(client: Client, guild: Guild, game: LoupGarouGame)
     await beginNight(client, guild, game);
     return;
   }
-  await playSoundEffect(guild.id, "cupidon");
 
   if (isFakePlayer(cupid.userId)) {
     const candidates = alivePlayers(game)
       .filter((p) => p.userId !== cupid.userId)
       .map((p) => p.userId)
       .sort(() => Math.random() - 0.5);
-    if (candidates.length >= 2) game.lovers = [candidates[0], candidates[1]];
+    if (candidates.length >= 2) {
+      game.lovers = [candidates[0], candidates[1]];
+      // Une fleche par amoureux designe.
+      await playSoundEffect(guild.id, "cupidon");
+      await playSoundEffect(guild.id, "cupidon");
+    }
     await beginNight(client, guild, game);
     return;
   }
@@ -198,6 +210,7 @@ export async function handleCupidPick1(client: Client, guild: Guild, game: LoupG
   if (game.phase !== "CUPID_PICK_1") return;
   game.cupidFirstPick = targetId;
   game.phase = "CUPID_PICK_2";
+  await playSoundEffect(guild.id, "cupidon");
 
   const cupid = findByRole(game, "CUPIDON");
   if (!cupid) return;
@@ -222,6 +235,7 @@ export async function handleCupidPick2(client: Client, guild: Guild, game: LoupG
   if (game.phase !== "CUPID_PICK_2" || !game.cupidFirstPick) return;
   game.lovers = [game.cupidFirstPick, targetId];
   game.cupidFirstPick = null;
+  await playSoundEffect(guild.id, "cupidon");
 
   for (const userId of game.lovers) {
     const member = await guild.members.fetch(userId).catch(() => null);
@@ -245,11 +259,14 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
   game.pendingNightVictim = null;
   game.nightDeaths = [];
   game.phase = "NIGHT_WOLF_VOTE";
-  setAmbiance(guild.id, "night");
 
+  // Le signal sonore (criquets) annonce la nuit avant qu'on la decrive, pas apres.
+  await playSoundEffect(guild.id, "night");
+  setAmbiance(guild.id, "night");
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) await narrate(guild.id, villageChannel, `🌙 **Nuit ${game.nightNumber}** - Le village s'endort...`);
-  await playSoundEffect(guild.id, "night");
+  await pause(2500);
+  if (game.phase !== "NIGHT_WOLF_VOTE") return; // la partie a pu se terminer pendant la pause
 
   // Tout le monde reste dans le meme salon vocal toute la partie, y compris les loups :
   // les deplacer vers un salon prive reviendrait a reveler publiquement qui ils sont des
@@ -434,19 +451,20 @@ async function announceDeathsAndContinue(
   dead: string[],
   onComplete: () => Promise<void> | void,
 ): Promise<void> {
+  // Le coq annonce le reveil avant qu'on le decrive ; le couteau (s'il y a une victime)
+  // vient ensuite comme un signal dramatique, juste avant la revelation parlee.
+  await playSoundEffect(guild.id, "dawn");
   setAmbiance(guild.id, "day");
   const villageChannel = await getTextChannel(guild, game.channelId);
 
   if (dead.length === 0) {
     if (villageChannel) await narrate(guild.id, villageChannel, "☀️ Le village se reveille... et personne n'est mort cette nuit !");
-    await playSoundEffect(guild.id, "dawn");
   } else {
+    await playSoundEffect(guild.id, "death");
     const names = await Promise.all(dead.map((id) => displayName(guild, id)));
     if (villageChannel) {
       await narrate(guild.id, villageChannel, `☀️ Le village se reveille... ${names.join(", ")} ${names.length > 1 ? "sont morts" : "est mort"} cette nuit.`);
     }
-    await playSoundEffect(guild.id, "death");
-    await playSoundEffect(guild.id, "dawn");
   }
 
   const winner = checkWinner(game);
@@ -511,9 +529,9 @@ async function resolveChasseurShot(client: Client, guild: Guild, game: LoupGarou
     const dead = applyDeaths(game, [targetId]);
     const villageChannel = await getTextChannel(guild, game.channelId);
     if (dead.length > 0 && villageChannel) {
+      await playSoundEffect(guild.id, "death");
       const names = await Promise.all(dead.map((id) => displayName(guild, id)));
       await narrate(guild.id, villageChannel, `🏹 Le Chasseur tire sur ${names.join(", ")} en tombant !`);
-      await playSoundEffect(guild.id, "death");
     }
 
     const winner = checkWinner(game);
@@ -555,6 +573,12 @@ async function runDayPhase(client: Client, guild: Guild, game: LoupGarouGame): P
 
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) {
+    // Un vrai temps de discussion avant le vote - sinon les boutons apparaissent
+    // instantanement apres l'annonce des morts, sans laisser le temps d'en parler.
+    await narrate(guild.id, villageChannel, "💬 Prenez le temps d'en discuter avant de voter...");
+    await pause(DISCUSSION_MS);
+    if (game.phase !== "DAY_VOTE") return; // la partie a pu se terminer pendant la pause (arret force, etc.)
+
     await narrate(guild.id, villageChannel, "🗳️ Le village doit maintenant voter pour eliminer un suspect.");
     const buttons = await playerButtons(guild, targets, "loupgarou:villagevote", ButtonStyle.Danger);
     await villageChannel.send({ components: chunkRows(buttons) }).catch(() => null);
@@ -589,9 +613,9 @@ async function resolveVillageVote(client: Client, guild: Guild, game: LoupGarouG
   }
 
   const dead = applyDeaths(game, [eliminated]);
+  await playSoundEffect(guild.id, "death");
   const names = await Promise.all(dead.map((id) => displayName(guild, id)));
   if (villageChannel) await narrate(guild.id, villageChannel, `⚖️ Le village a vote. ${names.join(", ")} ${names.length > 1 ? "sont elimines" : "est elimine"}.`);
-  await playSoundEffect(guild.id, "death");
 
   const winner = checkWinner(game);
   if (winner) {

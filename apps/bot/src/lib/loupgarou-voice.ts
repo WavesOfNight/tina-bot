@@ -12,29 +12,40 @@ import {
 } from "@discordjs/voice";
 import type { Client, GuildTextBasedChannel } from "discord.js";
 import { fileURLToPath } from "node:url";
-import { synthesizeSpeech } from "./tts.js";
+import { synthesizeSpeech, type BackgroundLayer } from "./tts.js";
 
 // Sources (toutes CC0 sauf mention contraire) : Field_cricket_unedited.ogg (Thatcher,
-// CC BY-SA 3.0, Wikimedia Commons), knife-blade-3, cock-song-1, small-bell-1, archery,
-// water-bubble-2 (BigSoundBank), chimes-dream-8 (LaSonotheque, meme licence CC0).
+// CC BY-SA 3.0, Wikimedia Commons), knife-blade-3, cock-song-1, archery, water-bubble-2
+// (BigSoundBank), chimes-dream-8 (LaSonotheque, meme licence CC0). Cupidon reutilise le
+// meme bruit d'arc que le Chasseur (l'image classique de la fleche de Cupidon), joue
+// deux fois - une par amoureux designe.
 const SOUND_EFFECTS = {
   night: fileURLToPath(new URL("../../assets/sfx/night-cricket.ogg", import.meta.url)),
   dawn: fileURLToPath(new URL("../../assets/sfx/dawn-rooster.mp3", import.meta.url)),
   death: fileURLToPath(new URL("../../assets/sfx/death-knife.mp3", import.meta.url)),
   voyante: fileURLToPath(new URL("../../assets/sfx/role-voyante.mp3", import.meta.url)),
   sorciere: fileURLToPath(new URL("../../assets/sfx/role-sorciere.mp3", import.meta.url)),
-  cupidon: fileURLToPath(new URL("../../assets/sfx/role-cupidon.mp3", import.meta.url)),
+  cupidon: fileURLToPath(new URL("../../assets/sfx/role-chasseur.mp3", import.meta.url)),
   chasseur: fileURLToPath(new URL("../../assets/sfx/role-chasseur.mp3", import.meta.url)),
 } as const;
 
 export type SoundEffect = keyof typeof SOUND_EFFECTS;
 
-// Ambiance melangee sous la voix pendant la nuit/le jour (vent nocturne, place de
-// village) - source BigSoundBank, CC0.
-const AMBIANCES = {
-  night: fileURLToPath(new URL("../../assets/sfx/ambiance-night.mp3", import.meta.url)),
-  day: fileURLToPath(new URL("../../assets/sfx/ambiance-day.mp3", import.meta.url)),
-} as const;
+// Fond sonore melange sous la voix pendant la nuit/le jour : ambiance (vent nocturne,
+// place de village - BigSoundBank CC0) + musique douce fournie par l'utilisateur.
+const AMBIANCE_VOLUME = 0.15;
+const MUSIC_VOLUME = 0.12;
+
+const AMBIANCES: Record<"night" | "day", BackgroundLayer[]> = {
+  night: [
+    { path: fileURLToPath(new URL("../../assets/sfx/ambiance-night.mp3", import.meta.url)), volume: AMBIANCE_VOLUME },
+    { path: fileURLToPath(new URL("../../assets/music/night.mp3", import.meta.url)), volume: MUSIC_VOLUME },
+  ],
+  day: [
+    { path: fileURLToPath(new URL("../../assets/sfx/ambiance-day.mp3", import.meta.url)), volume: AMBIANCE_VOLUME },
+    { path: fileURLToPath(new URL("../../assets/music/day.mp3", import.meta.url)), volume: MUSIC_VOLUME },
+  ],
+};
 
 export type Ambiance = keyof typeof AMBIANCES | null;
 
@@ -127,12 +138,15 @@ export function setAmbiance(guildId: string, ambiance: Ambiance): void {
 // pour ne jamais bloquer la progression de la partie.
 export async function say(guildId: string, text: string): Promise<void> {
   const session = sessions.get(guildId);
-  if (!session) return;
+  if (!session) {
+    console.log(`[loupgarou-voice] ligne non parlee, pas de session vocale active (guilde ${guildId}) : "${text}"`);
+    return;
+  }
   const spoken = stripForSpeech(text);
   if (!spoken) return;
   try {
-    const ambiancePath = session.ambiance ? AMBIANCES[session.ambiance] : undefined;
-    const resource = await synthesizeSpeech(spoken, undefined, ambiancePath);
+    const background = session.ambiance ? AMBIANCES[session.ambiance] : [];
+    const resource = await synthesizeSpeech(spoken, undefined, background);
     await playAndWait(session.player, resource);
   } catch (error) {
     console.error(`Echec de la synthese vocale (guilde ${guildId})`, error);
@@ -150,7 +164,10 @@ export async function narrate(guildId: string, textChannel: GuildTextBasedChanne
 // TTS.
 export async function playSoundEffect(guildId: string, effect: SoundEffect): Promise<void> {
   const session = sessions.get(guildId);
-  if (!session) return;
+  if (!session) {
+    console.log(`[loupgarou-voice] effet sonore "${effect}" ignore, pas de session vocale active (guilde ${guildId})`);
+    return;
+  }
   try {
     const resource = createAudioResource(SOUND_EFFECTS[effect]);
     await playAndWait(session.player, resource);
