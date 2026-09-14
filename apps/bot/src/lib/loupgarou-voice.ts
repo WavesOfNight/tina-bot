@@ -12,15 +12,14 @@ import {
 } from "@discordjs/voice";
 import type { Client, GuildTextBasedChannel } from "discord.js";
 import { fileURLToPath } from "node:url";
-import { synthesizeSpeech, createLoopingAudioResource } from "./tts.js";
+import { synthesizeSpeech, createLoopingAudioResource, createSfxOverMusicResource } from "./tts.js";
 
-// Sources (toutes CC0 sauf mention contraire) : Field_cricket_unedited.ogg (Thatcher,
-// CC BY-SA 3.0, Wikimedia Commons), knife-blade-3, cock-song-1, archery, water-bubble-2
-// (BigSoundBank), chimes-dream-8 (LaSonotheque, meme licence CC0). Cupidon reutilise le
-// meme bruit d'arc que le Chasseur (l'image classique de la fleche de Cupidon), joue
-// deux fois - une par amoureux designe.
+// Sources (toutes CC0 sauf mention contraire) : knife-blade-3, cock-song-1, archery,
+// water-bubble-2 (BigSoundBank), chimes-dream-8 (LaSonotheque, meme licence CC0). Cupidon
+// reutilise le meme bruit d'arc que le Chasseur (l'image classique de la fleche de
+// Cupidon), joue deux fois - une par amoureux designe. Pas de signal sonore pour le debut
+// de la nuit elle-meme (retire) - la musique d'ambiance suffit a marquer la transition.
 const SOUND_EFFECTS = {
-  night: fileURLToPath(new URL("../../assets/sfx/night-cricket.ogg", import.meta.url)),
   dawn: fileURLToPath(new URL("../../assets/sfx/dawn-rooster.mp3", import.meta.url)),
   death: fileURLToPath(new URL("../../assets/sfx/death-knife.mp3", import.meta.url)),
   voyante: fileURLToPath(new URL("../../assets/sfx/role-voyante.mp3", import.meta.url)),
@@ -31,10 +30,17 @@ const SOUND_EFFECTS = {
 
 export type SoundEffect = keyof typeof SOUND_EFFECTS;
 
-// Volume individuel de chaque effet (1 = volume d'origine du fichier) - le criquet est
-// nettement plus fort que les autres a l'origine, d'ou ce reglage a part.
-const SFX_VOLUME: Partial<Record<SoundEffect, number>> = {
-  night: 0.35,
+// Volume individuel de chaque effet (1 = volume d'origine du fichier) - les fichiers
+// viennent de sources differentes et n'ont pas le meme niveau a l'origine (le coq etait
+// nettement trop fort), d'ou un reglage explicite pour chacun plutot que de garder le
+// volume brut de chaque fichier.
+const SFX_VOLUME: Record<SoundEffect, number> = {
+  dawn: 0.5,
+  death: 0.7,
+  voyante: 0.6,
+  sorciere: 0.6,
+  cupidon: 0.6,
+  chasseur: 0.6,
 };
 
 // Musique de fond (fournie par l'utilisateur) melangee sous la voix pendant la nuit/le
@@ -210,9 +216,9 @@ export async function narrate(guildId: string, textChannel: GuildTextBasedChanne
   await say(guildId, text);
 }
 
-// Joue un petit effet sonore d'ambiance (best-effort, comme say()). Fichiers locaux geres
-// nativement par @discordjs/voice (transcodage ffmpeg automatique), pas besoin du pipeline
-// TTS.
+// Joue un petit effet sonore ponctuel (best-effort, comme say()). Si une ambiance est
+// active, l'effet est empile PAR-DESSUS la musique en cours (comme la voix) plutot que de
+// l'interrompre completement - la musique ne coupe jamais, meme le temps d'un effet.
 export async function playSoundEffect(guildId: string, effect: SoundEffect): Promise<void> {
   const session = sessions.get(guildId);
   if (!session) {
@@ -220,13 +226,15 @@ export async function playSoundEffect(guildId: string, effect: SoundEffect): Pro
     return;
   }
   try {
-    const resource = createAudioResource(SOUND_EFFECTS[effect], { inlineVolume: true });
-    resource.volume?.setVolume(SFX_VOLUME[effect] ?? 1);
+    const resource = session.ambiance
+      ? createSfxOverMusicResource(SOUND_EFFECTS[effect], SFX_VOLUME[effect], AMBIANCES[session.ambiance], currentAmbianceOffset(session))
+      : createAudioResource(SOUND_EFFECTS[effect], { inlineVolume: true });
+    if (!session.ambiance) resource.volume?.setVolume(SFX_VOLUME[effect]);
     await playAndWait(session.player, resource);
   } catch (error) {
     console.error(`Echec de la lecture de l'effet sonore "${effect}" (guilde ${guildId})`, error);
   } finally {
-    // L'effet est termine - la musique de fond (si active) doit reprendre derriere.
+    // L'effet est termine - la boucle seule (si une ambiance est active) reprend derriere.
     resumeAmbianceLoop(guildId);
   }
 }

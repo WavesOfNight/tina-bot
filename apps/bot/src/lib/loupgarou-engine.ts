@@ -34,6 +34,7 @@ const WOLF_VOTE_MS = 45_000;
 const ROLE_ACTION_MS = 30_000;
 const VILLAGE_VOTE_MS = 60_000;
 const DISCUSSION_MS = 20_000;
+const POST_GAME_DEBRIEF_MS = 5 * 60_000;
 
 const createdChannelsByGuild = new Map<string, CreatedChannels>();
 
@@ -289,10 +290,8 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
   // haute qui donneraient des indices. Demute au reveil, voir announceDeathsAndContinue.
   await setPlayersMuted(guild, [...game.players.keys()], true);
 
-  // L'ambiance est fixee avant le signal sonore (criquets) pour que la musique de fond
-  // reprenne avec la bonne piste des que l'effet ponctuel se termine, pas l'ancienne.
+  // Pas de signal sonore pour l'entree en nuit (retire) - juste la musique d'ambiance.
   setAmbiance(guild.id, "night");
-  await playSoundEffect(guild.id, "night");
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) await narrate(guild.id, villageChannel, `🌙 **Nuit ${game.nightNumber}** - Le village s'endort...`);
   await pause(2500);
@@ -708,7 +707,26 @@ async function endGameWithWinner(client: Client, guild: Guild, game: LoupGarouGa
     await bumpStat(game.guildId, player.userId, won ? "wins" : "losses");
   }
 
-  await cleanupGame(client, guild, game);
+  // Tina n'a plus rien a dire - elle quitte le vocal tout de suite (la radio peut
+  // reprendre immediatement derriere, plutot que d'attendre le debrief). Tout le monde
+  // est demute pour pouvoir debriefer, et les salons restent ouverts encore quelques
+  // minutes avant le nettoyage complet (suppression + retour aux salons d'origine) -
+  // /loupgarou stop declenche ce nettoyage immediatement si besoin (voir forceStopGame).
+  await setPlayersMuted(guild, [...game.players.keys()], false);
+  leaveNarratorChannel(guild.id);
+  resumeRadioForGuild(guild.id);
+  await syncRadioPlayback(client).catch((error) => console.error("Echec de la reprise de la radio apres la partie de loup-garou", error));
+
+  if (villageChannel) {
+    const minutes = Math.round(POST_GAME_DEBRIEF_MS / 60_000);
+    await villageChannel
+      .send(
+        `🎤 Tina quitte le vocal, mais les salons restent ouverts encore **${minutes} minutes** pour debriefer entre vous. Vous serez ensuite renvoyes dans vos salons d'origine.`,
+      )
+      .catch(() => null);
+  }
+
+  scheduleTimeout(game, () => void cleanupGame(client, guild, game), POST_GAME_DEBRIEF_MS);
 }
 
 async function cleanupGame(client: Client, guild: Guild, game: LoupGarouGame): Promise<void> {

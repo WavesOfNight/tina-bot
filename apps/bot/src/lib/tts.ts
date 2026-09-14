@@ -14,15 +14,17 @@ function escapeSsmlText(text: string): string {
 }
 
 // Volume de la musique de fond (voir loupgarou-voice.ts) quand elle est melangee sous
-// une ligne parlee - plus basse que quand elle joue seule (voir AMBIANCE_LOOP_VOLUME)
-// pour que la voix reste bien audible par-dessus, mais pas trop en retrait non plus.
-const BACKGROUND_VOLUME = 0.3;
+// une ligne parlee OU un effet sonore - plus basse que quand elle joue seule (voir
+// AMBIANCE_LOOP_VOLUME) pour que la voix/l'effet reste bien audible par-dessus, mais pas
+// trop en retrait non plus. Exportee pour que playSoundEffect (loupgarou-voice.ts)
+// applique exactement la meme reduction que say(), pour un volume coherent entre les deux.
+export const BACKGROUND_VOLUME = 0.3;
 
 // Chaque ligne parlee (et chaque reprise de la boucle entre les lignes, voir
 // createLoopingAudioResource ci-dessous) demarre un nouveau process ffmpeg pour le fond
 // sonore - sans ce fondu, le changement de volume est un "clic" audible a chaque
 // reprise. 600ms suffit a lisser la transition sans la rendre perceptible comme un delai.
-const BACKGROUND_FADE_IN_SECONDS = 0.6;
+export const BACKGROUND_FADE_IN_SECONDS = 0.6;
 
 export async function synthesizeSpeech(
   text: string,
@@ -114,6 +116,47 @@ export function createLoopingAudioResource(path: string, volume: number, offsetS
   });
   (ffmpeg as any).process?.stderr?.on("data", (chunk: Buffer) => {
     console.error(`[loupgarou-ambiance-ffmpeg] ${chunk.toString().trim()}`);
+  });
+  return createAudioResource(ffmpeg, { inputType: StreamType.Raw });
+}
+
+// Empile un effet sonore ponctuel (coq, couteau, etc.) PAR-DESSUS la musique de fond en
+// cours plutot que de l'interrompre - meme principe et memes reglages (position suivie,
+// fondu d'entree) que synthesizeSpeech avec fond sonore, juste entre deux fichiers
+// statiques au lieu d'un pipe TTS. Se termine avec l'effet (duration=first), la boucle
+// seule reprend juste apres (voir resumeAmbianceLoop dans loupgarou-voice.ts).
+export function createSfxOverMusicResource(
+  sfxPath: string,
+  sfxVolume: number,
+  musicPath: string,
+  musicOffsetSeconds: number,
+): AudioResource {
+  const ffmpeg = new FFmpeg({
+    args: [
+      "-i",
+      sfxPath,
+      "-ss",
+      String(musicOffsetSeconds),
+      "-stream_loop",
+      "-1",
+      "-i",
+      musicPath,
+      "-filter_complex",
+      `[0:a]volume=${sfxVolume}[fg];[1:a]afade=t=in:st=0:d=${BACKGROUND_FADE_IN_SECONDS},volume=${BACKGROUND_VOLUME}[bg];[fg][bg]amix=inputs=2:duration=first:dropout_transition=0`,
+      "-analyzeduration",
+      "0",
+      "-loglevel",
+      "warning",
+      "-f",
+      "s16le",
+      "-ar",
+      "48000",
+      "-ac",
+      "2",
+    ],
+  });
+  (ffmpeg as any).process?.stderr?.on("data", (chunk: Buffer) => {
+    console.error(`[loupgarou-sfx-ffmpeg] ${chunk.toString().trim()}`);
   });
   return createAudioResource(ffmpeg, { inputType: StreamType.Raw });
 }
