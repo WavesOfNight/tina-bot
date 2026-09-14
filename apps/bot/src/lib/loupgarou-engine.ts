@@ -19,7 +19,7 @@ import {
   endGame,
 } from "./loupgarou-store.js";
 import { setupChannels, grantWolfAccess, moveMembersToChannel, cleanupChannels, type CreatedChannels } from "./loupgarou-channels.js";
-import { joinNarratorChannel, narrate, leaveNarratorChannel, playSoundEffect } from "./loupgarou-voice.js";
+import { joinNarratorChannel, narrate, leaveNarratorChannel, playSoundEffect, setAmbiance } from "./loupgarou-voice.js";
 import { suspendRadioForGuild, resumeRadioForGuild, syncRadioPlayback } from "./radio.js";
 
 const WOLF_VOTE_MS = 45_000;
@@ -164,6 +164,7 @@ async function startCupidStep(client: Client, guild: Guild, game: LoupGarouGame)
     await beginNight(client, guild, game);
     return;
   }
+  await playSoundEffect(guild.id, "cupidon");
 
   if (isFakePlayer(cupid.userId)) {
     const candidates = alivePlayers(game)
@@ -244,6 +245,7 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
   game.pendingNightVictim = null;
   game.nightDeaths = [];
   game.phase = "NIGHT_WOLF_VOTE";
+  setAmbiance(guild.id, "night");
 
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) await narrate(guild.id, villageChannel, `🌙 **Nuit ${game.nightNumber}** - Le village s'endort...`);
@@ -311,7 +313,12 @@ async function resolveWolfVote(client: Client, guild: Guild, game: LoupGarouGame
 
 async function runVoyanteStep(client: Client, guild: Guild, game: LoupGarouGame): Promise<void> {
   const voyante = findByRole(game, "VOYANTE");
-  if (!voyante || isFakePlayer(voyante.userId)) {
+  if (!voyante) {
+    await advanceFromVoyante(client, guild, game);
+    return;
+  }
+  await playSoundEffect(guild.id, "voyante");
+  if (isFakePlayer(voyante.userId)) {
     await advanceFromVoyante(client, guild, game);
     return;
   }
@@ -348,7 +355,12 @@ export async function advanceFromVoyante(client: Client, guild: Guild, game: Lou
 async function runSorciereStep(client: Client, guild: Guild, game: LoupGarouGame): Promise<void> {
   const sorciere = findByRole(game, "SORCIERE");
   const hasPotion = sorciere ? !game.witch.lifePotionUsed || !game.witch.deathPotionUsed : false;
-  if (!sorciere || !hasPotion || isFakePlayer(sorciere.userId)) {
+  if (!sorciere || !hasPotion) {
+    await resolveNight(client, guild, game);
+    return;
+  }
+  await playSoundEffect(guild.id, "sorciere");
+  if (isFakePlayer(sorciere.userId)) {
     await resolveNight(client, guild, game);
     return;
   }
@@ -422,6 +434,7 @@ async function announceDeathsAndContinue(
   dead: string[],
   onComplete: () => Promise<void> | void,
 ): Promise<void> {
+  setAmbiance(guild.id, "day");
   const villageChannel = await getTextChannel(guild, game.channelId);
 
   if (dead.length === 0) {
@@ -467,6 +480,7 @@ async function promptChasseurRevenge(
     await onComplete();
     return;
   }
+  await playSoundEffect(guild.id, "chasseur");
 
   game.pendingChasseurCallback = onComplete;
 

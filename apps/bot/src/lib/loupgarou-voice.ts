@@ -14,21 +14,35 @@ import type { Client, GuildTextBasedChannel } from "discord.js";
 import { fileURLToPath } from "node:url";
 import { synthesizeSpeech } from "./tts.js";
 
-// Sources : Field_cricket_unedited.ogg (Thatcher, CC BY-SA 3.0, Wikimedia Commons),
-// Medium_rooster_crowing.ogg (alys, domaine public, Wikimedia Commons), knife-blade-3
-// (BigSoundBank, CC0).
+// Sources (toutes CC0 sauf mention contraire) : Field_cricket_unedited.ogg (Thatcher,
+// CC BY-SA 3.0, Wikimedia Commons), knife-blade-3, cock-song-1, small-bell-1, archery,
+// water-bubble-2 (BigSoundBank), chimes-dream-8 (LaSonotheque, meme licence CC0).
 const SOUND_EFFECTS = {
   night: fileURLToPath(new URL("../../assets/sfx/night-cricket.ogg", import.meta.url)),
-  dawn: fileURLToPath(new URL("../../assets/sfx/dawn-rooster.ogg", import.meta.url)),
+  dawn: fileURLToPath(new URL("../../assets/sfx/dawn-rooster.mp3", import.meta.url)),
   death: fileURLToPath(new URL("../../assets/sfx/death-knife.mp3", import.meta.url)),
+  voyante: fileURLToPath(new URL("../../assets/sfx/role-voyante.mp3", import.meta.url)),
+  sorciere: fileURLToPath(new URL("../../assets/sfx/role-sorciere.mp3", import.meta.url)),
+  cupidon: fileURLToPath(new URL("../../assets/sfx/role-cupidon.mp3", import.meta.url)),
+  chasseur: fileURLToPath(new URL("../../assets/sfx/role-chasseur.mp3", import.meta.url)),
 } as const;
 
 export type SoundEffect = keyof typeof SOUND_EFFECTS;
+
+// Ambiance melangee sous la voix pendant la nuit/le jour (vent nocturne, place de
+// village) - source BigSoundBank, CC0.
+const AMBIANCES = {
+  night: fileURLToPath(new URL("../../assets/sfx/ambiance-night.mp3", import.meta.url)),
+  day: fileURLToPath(new URL("../../assets/sfx/ambiance-day.mp3", import.meta.url)),
+} as const;
+
+export type Ambiance = keyof typeof AMBIANCES | null;
 
 interface NarratorSession {
   connection: VoiceConnection;
   player: AudioPlayer;
   channelId: string;
+  ambiance: Ambiance;
 }
 
 const sessions = new Map<string, NarratorSession>();
@@ -62,7 +76,7 @@ export async function joinNarratorChannel(client: Client, guildId: string, chann
     return false;
   }
 
-  sessions.set(guildId, { connection, player, channelId });
+  sessions.set(guildId, { connection, player, channelId, ambiance: existing?.ambiance ?? null });
   return true;
 }
 
@@ -87,14 +101,38 @@ function playAndWait(player: AudioPlayer, resource: AudioResource): Promise<void
   });
 }
 
+// Le texte narre est ecrit pour le salon (gras markdown, emoji) - la synthese vocale ne
+// doit recevoir que du texte brut, sinon elle epelle "etoile etoile" et le nom des emoji.
+const EMOJI_PATTERN =
+  /[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu;
+
+function stripForSpeech(text: string): string {
+  return text
+    .replace(/\*\*/g, "")
+    .replace(/[*_~`]/g, "")
+    .replace(EMOJI_PATTERN, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Change l'ambiance sonore melangee sous les prochaines lignes parlees (null = aucune).
+// N'affecte pas les effets sonores ponctuels (playSoundEffect).
+export function setAmbiance(guildId: string, ambiance: Ambiance): void {
+  const session = sessions.get(guildId);
+  if (session) session.ambiance = ambiance;
+}
+
 // Joue la ligne en voix (best-effort, n'echoue jamais) - a utiliser seulement apres
 // joinNarratorChannel(). Si la synthese ou la lecture echoue, se resout quand meme
 // pour ne jamais bloquer la progression de la partie.
 export async function say(guildId: string, text: string): Promise<void> {
   const session = sessions.get(guildId);
   if (!session) return;
+  const spoken = stripForSpeech(text);
+  if (!spoken) return;
   try {
-    const resource = await synthesizeSpeech(text);
+    const ambiancePath = session.ambiance ? AMBIANCES[session.ambiance] : undefined;
+    const resource = await synthesizeSpeech(spoken, undefined, ambiancePath);
     await playAndWait(session.player, resource);
   } catch (error) {
     console.error(`Echec de la synthese vocale (guilde ${guildId})`, error);
