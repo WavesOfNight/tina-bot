@@ -43,7 +43,9 @@ export interface LoupGarouGame {
   villageVotes: Map<string, string>;
   pendingNightVictim: string | null;
   nightDeaths: string[];
-  returnVoiceChannelId: string | null;
+  // Salon vocal de chaque joueur avant le debut de la partie (null si absent de tout
+  // salon vocal) - permet de les y remettre individuellement a la fin.
+  originalVoiceChannels: Map<string, string | null>;
   activeTimeouts: NodeJS.Timeout[];
   lobbyMessageId: string | null;
   // Suite a executer une fois le tir de vengeance du Chasseur resolu (ou saute) -
@@ -80,7 +82,7 @@ export function createGame(
     villageVotes: new Map(),
     pendingNightVictim: null,
     nightDeaths: [],
-    returnVoiceChannelId: null,
+    originalVoiceChannels: new Map(),
     activeTimeouts: [],
     lobbyMessageId: null,
     pendingChasseurCallback: null,

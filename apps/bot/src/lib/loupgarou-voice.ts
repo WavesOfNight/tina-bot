@@ -31,14 +31,13 @@ const SOUND_EFFECTS = {
 
 export type SoundEffect = keyof typeof SOUND_EFFECTS;
 
-// Fond sonore melange sous la voix pendant la nuit/le jour : ambiance (vent nocturne,
-// place de village - BigSoundBank CC0) + musique douce fournie par l'utilisateur, deja
-// pre-melangees ensemble en un seul fichier (voir apps/bot/assets/sfx, prepare a l'avance
-// avec ffmpeg) - un graphe de filtres a 3 entrees en temps reel (voix + 2 fonds sonores
-// separes) s'est avere peu fiable en production, d'ou ce pre-melange en amont.
+// Musique de fond (fournie par l'utilisateur) melangee sous la voix pendant la nuit/le
+// jour - seule la voix + la musique, sans bruit d'ambiance superpose (les bruitages
+// comme le criquet ou le coq restent des effets ponctuels joues seuls via
+// playSoundEffect, jamais en meme temps que la musique).
 const AMBIANCES = {
-  night: fileURLToPath(new URL("../../assets/sfx/background-night.mp3", import.meta.url)),
-  day: fileURLToPath(new URL("../../assets/sfx/background-day.mp3", import.meta.url)),
+  night: fileURLToPath(new URL("../../assets/music/night.mp3", import.meta.url)),
+  day: fileURLToPath(new URL("../../assets/music/day.mp3", import.meta.url)),
 } as const;
 
 export type Ambiance = keyof typeof AMBIANCES | null;

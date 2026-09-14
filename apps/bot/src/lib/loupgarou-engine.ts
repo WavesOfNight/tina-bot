@@ -18,7 +18,14 @@ import {
   clearGameTimeouts,
   endGame,
 } from "./loupgarou-store.js";
-import { setupChannels, grantWolfAccess, moveMembersToChannel, cleanupChannels, type CreatedChannels } from "./loupgarou-channels.js";
+import {
+  setupChannels,
+  grantWolfAccess,
+  moveMembersToChannel,
+  restoreOriginalChannels,
+  cleanupChannels,
+  type CreatedChannels,
+} from "./loupgarou-channels.js";
 import { joinNarratorChannel, narrate, leaveNarratorChannel, playSoundEffect, setAmbiance } from "./loupgarou-voice.js";
 import { suspendRadioForGuild, resumeRadioForGuild, syncRadioPlayback } from "./radio.js";
 
@@ -123,8 +130,13 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
   game.wolvesTextId = channels.wolvesTextId;
   game.channelId = channels.actionsTextId;
 
-  const guildRecord = await prisma.guild.findUnique({ where: { id: guild.id } });
-  game.returnVoiceChannelId = guildRecord?.radioEnabled ? (guildRecord.radioChannelId ?? null) : null;
+  // Retenu pour remettre chacun dans son salon d'origine a la fin de la partie (voir
+  // cleanupGame), avant de tous les regrouper dans le salon vocal commun de la partie.
+  for (const userId of playerIds) {
+    if (isFakePlayer(userId)) continue;
+    const member = await guild.members.fetch(userId).catch(() => null);
+    game.originalVoiceChannels.set(userId, member?.voice.channelId ?? null);
+  }
 
   const wolfIds = alivePlayers(game)
     .filter((p) => p.role === "LOUP_GAROU")
@@ -172,6 +184,9 @@ async function startCupidStep(client: Client, guild: Guild, game: LoupGarouGame)
     await beginNight(client, guild, game);
     return;
   }
+
+  const villageChannel = await getTextChannel(guild, game.channelId);
+  if (villageChannel) await narrate(guild.id, villageChannel, "💘 Cupidon se réveille et choisit en secret deux amoureux...");
 
   if (isFakePlayer(cupid.userId)) {
     const candidates = alivePlayers(game)
@@ -268,6 +283,8 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
   await pause(2500);
   if (game.phase !== "NIGHT_WOLF_VOTE") return; // la partie a pu se terminer pendant la pause
 
+  if (villageChannel) await narrate(guild.id, villageChannel, "🐺 Les Loups-Garous se réveillent et choisissent une victime...");
+
   // Tout le monde reste dans le meme salon vocal toute la partie, y compris les loups :
   // les deplacer vers un salon prive reviendrait a reveler publiquement qui ils sont des
   // qu'ils disparaissent du salon commun. Leur vote reste prive via le salon texte cache.
@@ -335,6 +352,9 @@ async function runVoyanteStep(client: Client, guild: Guild, game: LoupGarouGame)
     return;
   }
   await playSoundEffect(guild.id, "voyante");
+  const villageChannel = await getTextChannel(guild, game.channelId);
+  if (villageChannel) await narrate(guild.id, villageChannel, "🔮 La Voyante se réveille et sonde un villageois...");
+
   if (isFakePlayer(voyante.userId)) {
     await advanceFromVoyante(client, guild, game);
     return;
@@ -377,6 +397,9 @@ async function runSorciereStep(client: Client, guild: Guild, game: LoupGarouGame
     return;
   }
   await playSoundEffect(guild.id, "sorciere");
+  const villageChannel = await getTextChannel(guild, game.channelId);
+  if (villageChannel) await narrate(guild.id, villageChannel, "🧪 La Sorcière se réveille...");
+
   if (isFakePlayer(sorciere.userId)) {
     await resolveNight(client, guild, game);
     return;
@@ -675,10 +698,7 @@ async function cleanupGame(client: Client, guild: Guild, game: LoupGarouGame): P
   // et potentiellement surprenant, de deconnecter qui que ce soit dans ce cas).
   const channels = createdChannelsByGuild.get(guild.id);
   if (channels) {
-    if (game.returnVoiceChannelId) {
-      const playerIds = [...game.players.keys(), ...game.lobbyPlayerIds];
-      await moveMembersToChannel(guild, playerIds, game.returnVoiceChannelId);
-    }
+    await restoreOriginalChannels(guild, game.originalVoiceChannels);
     createdChannelsByGuild.delete(guild.id);
     await cleanupChannels(guild, channels);
 

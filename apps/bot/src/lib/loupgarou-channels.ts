@@ -85,6 +85,18 @@ export async function moveMembersToChannel(guild: Guild, userIds: string[], chan
   }
 }
 
+// Remet chaque joueur dans le salon vocal ou il etait avant la partie (ou le laisse tel
+// quel si null - il n'etait dans aucun salon avant, il sera simplement deconnecte quand
+// le salon de la partie sera supprime juste apres).
+export async function restoreOriginalChannels(guild: Guild, originalChannels: Map<string, string | null>): Promise<void> {
+  for (const [userId, channelId] of originalChannels) {
+    if (isFakePlayer(userId) || !channelId) continue;
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (!member?.voice.channelId) continue;
+    await member.voice.setChannel(channelId).catch(() => null);
+  }
+}
+
 export async function cleanupChannels(guild: Guild, channels: CreatedChannels): Promise<void> {
   const ids = [channels.wolvesTextId, channels.villageVoiceId, channels.actionsTextId, channels.categoryId];
   for (const id of ids) {
