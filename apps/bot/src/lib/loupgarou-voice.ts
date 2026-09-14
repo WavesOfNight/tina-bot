@@ -48,15 +48,36 @@ const AMBIANCES = {
 
 export type Ambiance = keyof typeof AMBIANCES | null;
 
-// Plus fort que BACKGROUND_VOLUME (tts.ts) : la musique joue seule ici, sans voix a
-// couvrir, entre deux repliques ou pendant une pause.
-const AMBIANCE_LOOP_VOLUME = 0.5;
+// Legerement plus fort que BACKGROUND_VOLUME (tts.ts) : la musique joue seule ici, sans
+// voix a couvrir - mais l'ecart reste volontairement faible pour eviter un effet de
+// "pompage" (fort entre les lignes, faible pendant) trop marque.
+const AMBIANCE_LOOP_VOLUME = 0.4;
+
+// Duree des pistes day.mp3/night.mp3 fournies (rognees a 120s avec fondu integre) - sert
+// a faire boucler le calcul de position (voir currentAmbianceOffset) sur la duree reelle.
+// La marge de securite evite de reprendre a quelques centaines de ms de la toute fin du
+// fichier, ce qui produirait un court accroc audible au moment ou -stream_loop reboucle.
+const TRACK_DURATION_SECONDS = 120;
+const TRACK_LOOP_SAFETY_MARGIN_SECONDS = 5;
 
 interface NarratorSession {
   connection: VoiceConnection;
   player: AudioPlayer;
   channelId: string;
   ambiance: Ambiance;
+  // Horodatage (Date.now()) du debut "virtuel" de la piste actuellement en ambiance -
+  // permet de faire reprendre chaque nouveau process ffmpeg (TTS ou boucle seule) a
+  // l'endroit ou la musique en est reellement, au lieu de repartir du debut du fichier a
+  // chaque replique (ce qui donnait l'impression que la musique "s'eteint et se relance").
+  ambianceStartedAt: number | null;
+}
+
+// Position (en secondes, repliee sur la duree du morceau) a laquelle reprendre la piste
+// d'ambiance actuelle pour qu'elle semble continuer plutot que redemarrer.
+function currentAmbianceOffset(session: NarratorSession): number {
+  if (!session.ambianceStartedAt) return 0;
+  const elapsed = (Date.now() - session.ambianceStartedAt) / 1000;
+  return elapsed % (TRACK_DURATION_SECONDS - TRACK_LOOP_SAFETY_MARGIN_SECONDS);
 }
 
 const sessions = new Map<string, NarratorSession>();
@@ -90,7 +111,13 @@ export async function joinNarratorChannel(client: Client, guildId: string, chann
     return false;
   }
 
-  sessions.set(guildId, { connection, player, channelId, ambiance: existing?.ambiance ?? null });
+  sessions.set(guildId, {
+    connection,
+    player,
+    channelId,
+    ambiance: existing?.ambiance ?? null,
+    ambianceStartedAt: existing?.ambianceStartedAt ?? null,
+  });
   return true;
 }
 
@@ -137,16 +164,18 @@ function stripForSpeech(text: string): string {
 function resumeAmbianceLoop(guildId: string): void {
   const session = sessions.get(guildId);
   if (!session?.ambiance) return;
-  const resource = createLoopingAudioResource(AMBIANCES[session.ambiance], AMBIANCE_LOOP_VOLUME);
+  const resource = createLoopingAudioResource(AMBIANCES[session.ambiance], AMBIANCE_LOOP_VOLUME, currentAmbianceOffset(session));
   session.player.play(resource);
 }
 
 // Change l'ambiance sonore de la partie (null = aucune) et relance aussitot la musique
 // correspondante en boucle. N'affecte pas les effets sonores ponctuels (playSoundEffect),
-// qui l'interrompent brievement avant qu'elle ne reprenne automatiquement.
+// qui l'interrompent brievement avant qu'elle ne reprenne automatiquement. Changer de
+// piste (nuit <-> jour) reinitialise la position ; garder la meme piste ne la touche pas.
 export function setAmbiance(guildId: string, ambiance: Ambiance): void {
   const session = sessions.get(guildId);
   if (!session) return;
+  if (session.ambiance !== ambiance) session.ambianceStartedAt = ambiance ? Date.now() : null;
   session.ambiance = ambiance;
   resumeAmbianceLoop(guildId);
 }
@@ -164,7 +193,7 @@ export async function say(guildId: string, text: string): Promise<void> {
   if (!spoken) return;
   try {
     const backgroundPath = session.ambiance ? AMBIANCES[session.ambiance] : undefined;
-    const resource = await synthesizeSpeech(spoken, undefined, backgroundPath);
+    const resource = await synthesizeSpeech(spoken, undefined, backgroundPath, currentAmbianceOffset(session));
     await playAndWait(session.player, resource);
   } catch (error) {
     console.error(`Echec de la synthese vocale (guilde ${guildId})`, error);

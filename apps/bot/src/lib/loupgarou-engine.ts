@@ -23,6 +23,7 @@ import {
   grantWolfAccess,
   moveMembersToChannel,
   restoreOriginalChannels,
+  setPlayersMuted,
   cleanupChannels,
   type CreatedChannels,
 } from "./loupgarou-channels.js";
@@ -283,6 +284,11 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
   game.nightDeaths = [];
   game.phase = "NIGHT_WOLF_VOTE";
 
+  // Personne ne devrait s'entendre parler pendant la nuit (le vote des loups passe par
+  // des boutons, pas par la voix) - le sert-mute evite les discussions/reactions a voix
+  // haute qui donneraient des indices. Demute au reveil, voir announceDeathsAndContinue.
+  await setPlayersMuted(guild, [...game.players.keys()], true);
+
   // L'ambiance est fixee avant le signal sonore (criquets) pour que la musique de fond
   // reprenne avec la bonne piste des que l'effet ponctuel se termine, pas l'ancienne.
   setAmbiance(guild.id, "night");
@@ -483,6 +489,9 @@ async function announceDeathsAndContinue(
   dead: string[],
   onComplete: () => Promise<void> | void,
 ): Promise<void> {
+  // Le village se reveille : tout le monde peut de nouveau se faire entendre.
+  await setPlayersMuted(guild, [...game.players.keys()], false);
+
   // Meme logique que pour la nuit : l'ambiance change avant l'effet sonore. Le coq
   // annonce le reveil avant qu'on le decrive ; le couteau (s'il y a une victime) vient
   // ensuite comme un signal dramatique, juste avant la revelation parlee.
@@ -648,7 +657,7 @@ async function resolveVillageVote(client: Client, guild: Guild, game: LoupGarouG
   const dead = applyDeaths(game, [eliminated]);
   await playSoundEffect(guild.id, "death");
   const names = await Promise.all(dead.map((id) => nameWithRole(guild, game, id)));
-  if (villageChannel) await narrate(guild.id, villageChannel, `⚖️ Le village a vote. ${names.join(", ")} ${names.length > 1 ? "sont elimines" : "est elimine"}.`);
+  if (villageChannel) await narrate(guild.id, villageChannel, `⚖️ Le village a voté. ${names.join(", ")} ${names.length > 1 ? "sont elimines" : "est elimine"}.`);
 
   const winner = checkWinner(game);
   if (winner) {
@@ -708,6 +717,9 @@ async function cleanupGame(client: Client, guild: Guild, game: LoupGarouGame): P
   // et potentiellement surprenant, de deconnecter qui que ce soit dans ce cas).
   const channels = createdChannelsByGuild.get(guild.id);
   if (channels) {
+    // Filet de securite : si la partie s'arrete en pleine nuit (arret force, victoire
+    // pendant NIGHT_*), personne ne doit rester sert-mute apres coup.
+    await setPlayersMuted(guild, [...game.players.keys()], false);
     await restoreOriginalChannels(guild, game.originalVoiceChannels);
     createdChannelsByGuild.delete(guild.id);
     await cleanupChannels(guild, channels);

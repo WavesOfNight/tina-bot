@@ -97,6 +97,20 @@ export async function restoreOriginalChannels(guild: Guild, originalChannels: Ma
   }
 }
 
+// Sert-mute/demute tout le monde pour la nuit : personne ne devrait pouvoir se faire
+// entendre pendant que le village "dort" (le vote des loups passe par de simples boutons
+// dans leur salon texte prive, pas par la voix) - ca evite les discussions/reactions a
+// voix haute qui trahiraient des soupcons ou des infos pendant une phase cense etre
+// silencieuse. Demute au reveil pour que la discussion du jour redevienne possible.
+export async function setPlayersMuted(guild: Guild, playerIds: string[], muted: boolean): Promise<void> {
+  for (const userId of playerIds) {
+    if (isFakePlayer(userId)) continue;
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (!member?.voice.channelId) continue;
+    await member.voice.setMute(muted, muted ? "Nuit du Loup-Garou" : "Reveil du village").catch(() => null);
+  }
+}
+
 export async function cleanupChannels(guild: Guild, channels: CreatedChannels): Promise<void> {
   const ids = [channels.wolvesTextId, channels.villageVoiceId, channels.actionsTextId, channels.categoryId];
   for (const id of ids) {

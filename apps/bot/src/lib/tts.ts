@@ -15,10 +15,21 @@ function escapeSsmlText(text: string): string {
 
 // Volume de la musique de fond (voir loupgarou-voice.ts) quand elle est melangee sous
 // une ligne parlee - plus basse que quand elle joue seule (voir AMBIANCE_LOOP_VOLUME)
-// pour que la voix reste bien audible par-dessus.
-const BACKGROUND_VOLUME = 0.28;
+// pour que la voix reste bien audible par-dessus, mais pas trop en retrait non plus.
+const BACKGROUND_VOLUME = 0.3;
 
-export async function synthesizeSpeech(text: string, voice: string = NARRATOR_VOICE, backgroundPath?: string): Promise<AudioResource> {
+// Chaque ligne parlee (et chaque reprise de la boucle entre les lignes, voir
+// createLoopingAudioResource ci-dessous) demarre un nouveau process ffmpeg pour le fond
+// sonore - sans ce fondu, le changement de volume est un "clic" audible a chaque
+// reprise. 600ms suffit a lisser la transition sans la rendre perceptible comme un delai.
+const BACKGROUND_FADE_IN_SECONDS = 0.6;
+
+export async function synthesizeSpeech(
+  text: string,
+  voice: string = NARRATOR_VOICE,
+  backgroundPath?: string,
+  backgroundOffsetSeconds = 0,
+): Promise<AudioResource> {
   const tts = new MsEdgeTTS();
   await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
   const { audioStream } = tts.toStream(escapeSsmlText(text));
@@ -35,16 +46,20 @@ export async function synthesizeSpeech(text: string, voice: string = NARRATOR_VO
   // (duration=first) puisqu'on ne connait pas sa longueur a l'avance. Un seul input
   // supplementaire (deliberement) - un graphe de filtres a 3 entrees (voix + 2 fonds
   // sonores separes) s'est avere peu fiable en production, d'ou le pre-melange en amont.
+  // -ss reprend le fond a l'endroit ou il en etait (voir loupgarou-voice.ts) plutot que
+  // de repartir du debut du fichier a chaque replique, et afade lisse la reprise.
   const args = backgroundPath
     ? [
         "-i",
         "pipe:0",
+        "-ss",
+        String(backgroundOffsetSeconds),
         "-stream_loop",
         "-1",
         "-i",
         backgroundPath,
         "-filter_complex",
-        `[1:a]volume=${BACKGROUND_VOLUME}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=0`,
+        `[1:a]afade=t=in:st=0:d=${BACKGROUND_FADE_IN_SECONDS},volume=${BACKGROUND_VOLUME}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=0`,
         "-analyzeduration",
         "0",
         "-loglevel",
@@ -71,15 +86,20 @@ export async function synthesizeSpeech(text: string, voice: string = NARRATOR_VO
 // ce qui permet a l'ambiance de continuer sans interruption entre deux repliques (ou
 // pendant une pause) au lieu de couper des que le TTS s'arrete. Interrompue simplement en
 // jouant une autre resource sur le meme player (voir loupgarou-voice.ts).
-export function createLoopingAudioResource(path: string, volume: number): AudioResource {
+// offsetSeconds reprend la piste a l'endroit ou elle en etait plutot que de repartir du
+// debut a chaque reprise (voir currentAmbianceOffset dans loupgarou-voice.ts), et le
+// fondu d'entree lisse le "clic" que produirait sinon un changement de volume brutal.
+export function createLoopingAudioResource(path: string, volume: number, offsetSeconds = 0): AudioResource {
   const ffmpeg = new FFmpeg({
     args: [
+      "-ss",
+      String(offsetSeconds),
       "-stream_loop",
       "-1",
       "-i",
       path,
       "-filter:a",
-      `volume=${volume}`,
+      `afade=t=in:st=0:d=${BACKGROUND_FADE_IN_SECONDS},volume=${volume}`,
       "-analyzeduration",
       "0",
       "-loglevel",
