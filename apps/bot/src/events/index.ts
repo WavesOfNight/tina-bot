@@ -6,6 +6,8 @@ import * as messageDelete from "./messageDelete.js";
 import * as messageUpdate from "./messageUpdate.js";
 import * as messageReactionAdd from "./messageReactionAdd.js";
 import * as interactionCreate from "./interactionCreate.js";
+import * as voiceStateUpdate from "./voiceStateUpdate.js";
+import * as channelUpdate from "./channelUpdate.js";
 
 export const events = [
   ready,
@@ -16,4 +18,6 @@ export const events = [
   messageUpdate,
   messageReactionAdd,
   interactionCreate,
+  voiceStateUpdate,
+  channelUpdate,
 ];

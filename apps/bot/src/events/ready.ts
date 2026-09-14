@@ -9,6 +9,7 @@ import { updateStatsChannels } from "../lib/stats-channel.js";
 import { checkDueReminders } from "../lib/reminders.js";
 import { syncRadioPlayback } from "../lib/radio.js";
 import { syncPermanentInvites } from "../lib/invite.js";
+import { cleanupEmptyTempChannels } from "../lib/hub-voice.js";
 
 export const name = Events.ClientReady;
 export const once = true;
@@ -32,6 +33,7 @@ export async function execute(client: Client<true>) {
     checkExpiredTempBans(client).catch((error) => console.error("Erreur lors de la verification des bans temporaires", error));
     checkDueReminders(client).catch((error) => console.error("Erreur lors de la verification des rappels", error));
     syncRadioPlayback(client).catch((error) => console.error("Erreur lors de la synchronisation de la radio", error));
+    cleanupEmptyTempChannels(client).catch((error) => console.error("Erreur lors du nettoyage des salons vocaux personnalises", error));
   }, 15_000);
 
   setInterval(() => {

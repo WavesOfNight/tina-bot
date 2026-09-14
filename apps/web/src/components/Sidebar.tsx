@@ -14,6 +14,7 @@ import {
   MousePointerClick,
   Bell,
   Radio,
+  Mic,
   Link2,
   Settings,
   TvMinimalPlay,
@@ -44,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "tickets", label: "Tickets", icon: Ticket, section: "modules" },
   { href: "alertes", label: "Alertes", icon: Bell, section: "modules" },
   { href: "radio", label: "Radio", icon: Radio, section: "modules" },
+  { href: "salons-vocaux", label: "Salons Vocaux", icon: Mic, section: "modules" },
   { href: "invitation", label: "Invitation", icon: Link2, section: "modules" },
 ];
 

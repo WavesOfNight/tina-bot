@@ -173,6 +173,9 @@ model Guild {
   ticketPanelChannelId String?
   ticketPanelMessageId String?
 
+  hubVoiceChannelId String?
+  hubChannelNameTemplate String @default("🔊 Salon de {user}")
+
   createdAt           DateTime @default(now())
 
   welcomeConfig      WelcomeConfig?
@@ -189,6 +192,18 @@ model Guild {
   socialAlerts       SocialAlert[]
   starboardPosts     StarboardPost[]
   tickets            Ticket[]
+  tempVoiceChannels  TempVoiceChannel[]
+}
+
+model TempVoiceChannel {
+  id        Int      @id @default(autoincrement())
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guildId   String
+  channelId String   @unique
+  ownerId   String
+  createdAt DateTime @default(now())
+
+  @@index([guildId])
 }
 
 model StarboardPost {
