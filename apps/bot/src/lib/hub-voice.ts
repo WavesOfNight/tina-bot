@@ -1,4 +1,13 @@
-import { ChannelType, PermissionFlagsBits, type Client, type Guild, type GuildMember, type VoiceBasedChannel, type VoiceChannel } from "discord.js";
+import {
+  ChannelType,
+  PermissionFlagsBits,
+  type Client,
+  type Guild,
+  type GuildMember,
+  type UserSelectMenuInteraction,
+  type VoiceBasedChannel,
+  type VoiceChannel,
+} from "discord.js";
 import { prisma, findAutoModMatch } from "@tina/database";
 import { logCase, applyWarnEscalation } from "./moderation.js";
 
@@ -73,11 +82,47 @@ export async function warnAndDeleteForBadName(guild: Guild, channel: VoiceBasedC
   const member = await guild.members.fetch(ownerId).catch(() => null);
   await member
     ?.send(
-      `⚠️ Ton salon vocal personnalise sur **${guild.name}** a ete supprime car son nom contenait un terme interdit (${matchedWord}). Tu peux en recreer un avec un nom correct.`,
+      `⚠️ Ton salon vocal personnalisé sur **${guild.name}** a été supprimé car son nom contenait un terme interdit (${matchedWord}). Tu peux en recréer un avec un nom correct.`,
     )
     .catch(() => null);
 
   await channel.delete().catch(() => null);
+}
+
+// Gestionnaire du menu "restreindre l'acces" propose apres /creer-vocal (voir
+// creer-vocal.ts) - selection vide = salon remis public, sinon seuls les membres
+// selectionnes (+ le proprietaire) peuvent le voir/rejoindre.
+export async function applyVoiceChannelAccess(interaction: UserSelectMenuInteraction, channelId: string): Promise<void> {
+  if (!interaction.guild) return;
+  const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isVoiceBased()) {
+    await interaction.update({ content: "Ce salon n'existe plus.", embeds: [], components: [] }).catch(() => null);
+    return;
+  }
+
+  const everyoneId = interaction.guild.roles.everyone.id;
+  const selected = interaction.values;
+
+  if (selected.length === 0) {
+    await channel.permissionOverwrites.edit(everyoneId, { ViewChannel: null, Connect: null }).catch(() => null);
+    await interaction.update({ content: `🔊 **${channel.name}** est public - tout le monde peut le rejoindre.`, embeds: [], components: [] }).catch(() => null);
+    return;
+  }
+
+  await channel.permissionOverwrites.edit(everyoneId, { ViewChannel: false, Connect: false }).catch(() => null);
+  const botId = interaction.guild.members.me?.id;
+  if (botId) await channel.permissionOverwrites.edit(botId, { ViewChannel: true, Connect: true }).catch(() => null);
+  for (const userId of selected) {
+    await channel.permissionOverwrites.edit(userId, { ViewChannel: true, Connect: true }).catch(() => null);
+  }
+
+  await interaction
+    .update({
+      content: `🔒 **${channel.name}** est maintenant privé - accès limité à : ${selected.map((id) => `<@${id}>`).join(", ")}`,
+      embeds: [],
+      components: [],
+    })
+    .catch(() => null);
 }
 
 // Filet de securite periodique (voir ready.ts) : supprime les salons personnels devenus

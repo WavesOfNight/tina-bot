@@ -46,6 +46,10 @@ export interface LoupGarouGame {
   // Salon vocal de chaque joueur avant le debut de la partie (null si absent de tout
   // salon vocal) - permet de les y remettre individuellement a la fin.
   originalVoiceChannels: Map<string, string | null>;
+  // Salon texte prive (un par joueur, cree a la demande) utilise pour les prompts
+  // d'action de nuit des roles solo (Voyante, Sorciere, Cupidon, Chasseur) a la place des
+  // MP - voir loupgarou-channels.ts.
+  privateTextChannels: Map<string, string>;
   activeTimeouts: NodeJS.Timeout[];
   lobbyMessageId: string | null;
   // Suite a executer une fois le tir de vengeance du Chasseur resolu (ou saute) -
@@ -83,6 +87,7 @@ export function createGame(
     pendingNightVictim: null,
     nightDeaths: [],
     originalVoiceChannels: new Map(),
+    privateTextChannels: new Map(),
     activeTimeouts: [],
     lobbyMessageId: null,
     pendingChasseurCallback: null,

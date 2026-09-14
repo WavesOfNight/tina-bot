@@ -1,4 +1,4 @@
-import { ChannelType, PermissionFlagsBits, type Guild, type OverwriteResolvable } from "discord.js";
+import { ChannelType, PermissionFlagsBits, type Guild, type GuildTextBasedChannel, type OverwriteResolvable } from "discord.js";
 import { isFakePlayer } from "./loupgarou-store.js";
 
 export interface CreatedChannels {
@@ -107,7 +107,64 @@ export async function setPlayersMuted(guild: Guild, playerIds: string[], muted: 
     if (isFakePlayer(userId)) continue;
     const member = await guild.members.fetch(userId).catch(() => null);
     if (!member?.voice.channelId) continue;
-    await member.voice.setMute(muted, muted ? "Nuit du Loup-Garou" : "Reveil du village").catch(() => null);
+    await member.voice.setMute(muted, muted ? "Nuit du Loup-Garou" : "Réveil du village").catch(() => null);
+  }
+}
+
+function sanitizeChannelNamePart(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 80) || "joueur"
+  );
+}
+
+// Salon texte prive (un par joueur, cree a la demande) pour les prompts d'action de nuit
+// des roles solo (Voyante, Sorciere, Cupidon, Chasseur) - remplace les MP (parfois
+// bloques, ou juste manques) tout en restant invisible aux autres joueurs. Reutilise pour
+// chaque action suivante du meme joueur plutot que d'en recreer un a chaque fois.
+export async function getOrCreatePrivateChannel(
+  guild: Guild,
+  categoryId: string,
+  userId: string,
+  displayName: string,
+  privateTextChannels: Map<string, string>,
+): Promise<{ channel: GuildTextBasedChannel; isNew: boolean } | null> {
+  const existingId = privateTextChannels.get(userId);
+  if (existingId) {
+    const existing = await guild.channels.fetch(existingId).catch(() => null);
+    if (existing?.isTextBased()) return { channel: existing, isNew: false };
+  }
+
+  const everyoneId = guild.roles.everyone.id;
+  const botId = guild.members.me?.id;
+  const channel = await guild.channels
+    .create({
+      name: `secret-${sanitizeChannelNamePart(displayName)}`,
+      type: ChannelType.GuildText,
+      parent: categoryId,
+      permissionOverwrites: [
+        { id: everyoneId, deny: [PermissionFlagsBits.ViewChannel] },
+        { id: userId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+        ...(botId ? [{ id: botId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }] : []),
+      ],
+    })
+    .catch(() => null);
+  if (!channel) return null;
+
+  privateTextChannels.set(userId, channel.id);
+  return { channel, isNew: true };
+}
+
+export async function cleanupPrivateChannels(guild: Guild, privateTextChannels: Map<string, string>): Promise<void> {
+  for (const channelId of privateTextChannels.values()) {
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    await channel?.delete().catch(() => null);
   }
 }
 

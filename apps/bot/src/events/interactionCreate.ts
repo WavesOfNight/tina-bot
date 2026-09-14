@@ -2,6 +2,7 @@ import { Events, type Interaction } from "discord.js";
 import { prisma } from "@tina/database";
 import { commandMap } from "../commands/index.js";
 import { buttonHandlerMap } from "../buttons/index.js";
+import { applyVoiceChannelAccess } from "../lib/hub-voice.js";
 
 export const name = Events.InteractionCreate;
 export const once = false;
@@ -50,6 +51,14 @@ export async function execute(interaction: Interaction) {
       } else {
         await interaction.reply(payload).catch(() => null);
       }
+    }
+    return;
+  }
+
+  if (interaction.isUserSelectMenu()) {
+    const [prefix, action, channelId] = interaction.customId.split(":");
+    if (prefix === "creervocal" && action === "restrict" && channelId) {
+      await applyVoiceChannelAccess(interaction, channelId).catch((error) => console.error(`Erreur dans le menu ${interaction.customId}`, error));
     }
   }
 }

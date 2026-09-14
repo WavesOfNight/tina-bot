@@ -24,6 +24,8 @@ import {
   moveMembersToChannel,
   restoreOriginalChannels,
   setPlayersMuted,
+  getOrCreatePrivateChannel,
+  cleanupPrivateChannels,
   cleanupChannels,
   type CreatedChannels,
 } from "./loupgarou-channels.js";
@@ -62,6 +64,27 @@ async function getTextChannel(guild: Guild, channelId: string | null) {
   if (!channelId) return null;
   const channel = await guild.channels.fetch(channelId).catch(() => null);
   return channel?.isTextBased() && !channel.isDMBased() ? channel : null;
+}
+
+// Envoie un prompt d'action de nuit (role solo : Voyante, Sorciere, Cupidon, Chasseur)
+// dans le salon texte prive du joueur plutot qu'en MP - contrairement au MP de reveal du
+// role au tout debut de la partie, qui lui reste un vrai message prive (voir startGame).
+// Ne fait rien pour un faux joueur (member est alors null) ni si la partie n'a pas de
+// categorie (setup des salons echoue - ne devrait jamais arriver ici).
+async function sendPrivatePrompt(
+  guild: Guild,
+  game: LoupGarouGame,
+  userId: string,
+  displayNameText: string,
+  payload: { content: string; components?: ActionRowBuilder<ButtonBuilder>[] },
+): Promise<void> {
+  if (!game.categoryId) return;
+  const result = await getOrCreatePrivateChannel(guild, game.categoryId, userId, displayNameText, game.privateTextChannels);
+  if (!result) return;
+  if (result.isNew) {
+    await result.channel.send("🔒 Ce salon est privé - toi seul peux le voir. Tes actions de nuit s'y dérouleront.").catch(() => null);
+  }
+  await result.channel.send(payload).catch(() => null);
 }
 
 function scheduleTimeout(game: LoupGarouGame, fn: () => void, ms: number): void {
@@ -110,13 +133,13 @@ export async function closeLobby(client: Client, guild: Guild, game: LoupGarouGa
 
   const channel = await getTextChannel(guild, game.channelId);
   if (game.lobbyPlayerIds.size < game.minPlayers) {
-    await channel?.send(`❌ Pas assez de joueurs (${game.lobbyPlayerIds.size}/${game.minPlayers} minimum). Partie annulee.`).catch(() => null);
+    await channel?.send(`❌ Pas assez de joueurs (${game.lobbyPlayerIds.size}/${game.minPlayers} minimum). Partie annulée.`).catch(() => null);
     endGame(guild.id);
     return;
   }
 
   game.phase = "NIGHT_WOLF_VOTE"; // sortie immediate du lobby pour bloquer toute reentree pendant le setup
-  await channel?.send(`✅ ${game.lobbyPlayerIds.size} joueurs prets ! La partie commence, verifiez vos messages prives...`).catch(() => null);
+  await channel?.send(`✅ ${game.lobbyPlayerIds.size} joueurs prêts ! La partie commence, vérifiez vos messages privés...`).catch(() => null);
   await startGame(client, guild, game);
 }
 
@@ -130,7 +153,7 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
   const channels = await setupChannels(guild, playerIds);
   if (!channels) {
     const channel = await getTextChannel(guild, game.channelId);
-    await channel?.send("Impossible de creer les salons de la partie (verifie que j'ai la permission Gerer les salons).").catch(() => null);
+    await channel?.send("Impossible de créer les salons de la partie (vérifie que j'ai la permission Gérer les salons).").catch(() => null);
     endGame(game.guildId);
     return;
   }
@@ -159,7 +182,7 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
     const role = ROLES[player.role];
     await member
       ?.send(
-        `🐺 **Loup-Garou - ${guild.name}**\nTon role : **${role.name}** (camp : ${role.team === "LOUPS" ? "Loups-Garous" : "Village"})\n${role.description}`,
+        `🐺 **Loup-Garou - ${guild.name}**\nTon rôle : **${role.name}** (camp : ${role.team === "LOUPS" ? "Loups-Garous" : "Village"})\n${role.description}`,
       )
       .catch(() => null);
   }
@@ -177,7 +200,7 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
     await narrate(
       guild.id,
       actionsChannel,
-      `La partie commence avec ${playerIds.length} joueurs. Chacun a recu son role par message prive. Que la partie commence !`,
+      `La partie commence avec ${playerIds.length} joueurs. Chacun a reçu son rôle par message privé. Que la partie commence !`,
     );
   }
 
@@ -219,7 +242,12 @@ async function startCupidStep(client: Client, guild: Guild, game: LoupGarouGame)
     .filter((p) => p.userId !== cupid.userId)
     .map((p) => p.userId);
   const buttons = await playerButtons(guild, targets, "loupgarou:cupid1");
-  await member?.send({ content: "💘 Tu es Cupidon. Choisis le **premier** amoureux :", components: chunkRows(buttons) }).catch(() => null);
+  if (member) {
+    await sendPrivatePrompt(guild, game, cupid.userId, member.displayName, {
+      content: "💘 Tu es Cupidon. Choisis le **premier** amoureux :",
+      components: chunkRows(buttons),
+    });
+  }
 
   scheduleTimeout(
     game,
@@ -244,7 +272,12 @@ export async function handleCupidPick1(client: Client, guild: Guild, game: LoupG
     .filter((p) => p.userId !== cupid.userId && p.userId !== targetId)
     .map((p) => p.userId);
   const buttons = await playerButtons(guild, targets, "loupgarou:cupid2");
-  await member?.send({ content: "💘 Choisis le **second** amoureux :", components: chunkRows(buttons) }).catch(() => null);
+  if (member) {
+    await sendPrivatePrompt(guild, game, cupid.userId, member.displayName, {
+      content: "💘 Choisis le **second** amoureux :",
+      components: chunkRows(buttons),
+    });
+  }
 
   scheduleTimeout(
     game,
@@ -264,11 +297,12 @@ export async function handleCupidPick2(client: Client, guild: Guild, game: LoupG
 
   for (const userId of game.lovers) {
     const member = await guild.members.fetch(userId).catch(() => null);
+    if (!member) continue;
     const otherId = loverOf(game, userId);
     const otherName = otherId ? await displayName(guild, otherId) : "quelqu'un";
-    await member
-      ?.send(`💘 Cupidon a fait de toi et **${otherName}** des amoureux. Si l'un de vous meurt, l'autre meurt de chagrin aussitot.`)
-      .catch(() => null);
+    await sendPrivatePrompt(guild, game, userId, member.displayName, {
+      content: `💘 Cupidon a fait de toi et **${otherName}** des amoureux. Si l'un de vous meurt, l'autre meurt de chagrin aussitôt.`,
+    });
   }
 
   await beginNight(client, guild, game);
@@ -380,7 +414,12 @@ async function runVoyanteStep(client: Client, guild: Guild, game: LoupGarouGame)
     .filter((p) => p.userId !== voyante.userId)
     .map((p) => p.userId);
   const buttons = await playerButtons(guild, targets, "loupgarou:voyante");
-  await member?.send({ content: "🔮 Choisis un joueur a sonder cette nuit :", components: chunkRows(buttons) }).catch(() => null);
+  if (member) {
+    await sendPrivatePrompt(guild, game, voyante.userId, member.displayName, {
+      content: "🔮 Choisis un joueur à sonder cette nuit :",
+      components: chunkRows(buttons),
+    });
+  }
 
   scheduleTimeout(game, () => void advanceFromVoyante(client, guild, game), ROLE_ACTION_MS);
 }
@@ -441,9 +480,9 @@ async function runSorciereStep(client: Client, guild: Guild, game: LoupGarouGame
   buttons.push(new ButtonBuilder().setCustomId(`loupgarou:witchskip:${guild.id}:_`).setLabel("Ne rien faire").setStyle(ButtonStyle.Secondary));
 
   const intro = game.pendingNightVictim
-    ? `🧪 Les loups ont choisi de devorer **${victimName}** cette nuit. Que fais-tu ?`
-    : "🧪 Les loups n'ont mange personne cette nuit. Veux-tu empoisonner quelqu'un ?";
-  await member?.send({ content: intro, components: chunkRows(buttons) }).catch(() => null);
+    ? `🧪 Les loups ont choisi de dévorer **${victimName}** cette nuit. Que fais-tu ?`
+    : "🧪 Les loups n'ont mangé personne cette nuit. Veux-tu empoisonner quelqu'un ?";
+  if (member) await sendPrivatePrompt(guild, game, sorciere.userId, member.displayName, { content: intro, components: chunkRows(buttons) });
 
   scheduleTimeout(game, () => void resolveNight(client, guild, game), ROLE_ACTION_MS);
 }
@@ -499,12 +538,12 @@ async function announceDeathsAndContinue(
   const villageChannel = await getTextChannel(guild, game.channelId);
 
   if (dead.length === 0) {
-    if (villageChannel) await narrate(guild.id, villageChannel, "☀️ Le village se reveille... et personne n'est mort cette nuit !");
+    if (villageChannel) await narrate(guild.id, villageChannel, "☀️ Le village se réveille... et personne n'est mort cette nuit !");
   } else {
     await playSoundEffect(guild.id, "death");
     const names = await Promise.all(dead.map((id) => nameWithRole(guild, game, id)));
     if (villageChannel) {
-      await narrate(guild.id, villageChannel, `☀️ Le village se reveille... ${names.join(", ")} ${names.length > 1 ? "sont morts" : "est mort"} cette nuit.`);
+      await narrate(guild.id, villageChannel, `☀️ Le village se réveille... ${names.join(", ")} ${names.length > 1 ? "sont morts" : "est mort"} cette nuit.`);
     }
   }
 
@@ -552,7 +591,12 @@ async function promptChasseurRevenge(
 
   const member = await guild.members.fetch(chasseurId).catch(() => null);
   const buttons = await playerButtons(guild, targets, "loupgarou:chasseur", ButtonStyle.Danger);
-  await member?.send({ content: "🏹 Tu es mort, mais avant de partir tu peux tirer sur quelqu'un !", components: chunkRows(buttons) }).catch(() => null);
+  if (member) {
+    await sendPrivatePrompt(guild, game, chasseurId, member.displayName, {
+      content: "🏹 Tu es mort, mais avant de partir tu peux tirer sur quelqu'un !",
+      components: chunkRows(buttons),
+    });
+  }
 
   scheduleTimeout(game, () => void resolveChasseurShot(client, guild, game, null), ROLE_ACTION_MS);
 }
@@ -620,7 +664,7 @@ async function runDayPhase(client: Client, guild: Guild, game: LoupGarouGame): P
     await pause(DISCUSSION_MS);
     if (game.phase !== "DAY_VOTE") return; // la partie a pu se terminer pendant la pause (arret force, etc.)
 
-    await narrate(guild.id, villageChannel, "🗳️ Le village doit maintenant voter pour eliminer un suspect.");
+    await narrate(guild.id, villageChannel, "🗳️ Le village doit maintenant voter pour éliminer un suspect.");
     const buttons = await playerButtons(guild, targets, "loupgarou:villagevote", ButtonStyle.Danger);
     await villageChannel.send({ components: chunkRows(buttons) }).catch(() => null);
   }
@@ -648,7 +692,7 @@ async function resolveVillageVote(client: Client, guild: Guild, game: LoupGarouG
 
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (!eliminated) {
-    if (villageChannel) await narrate(guild.id, villageChannel, "⚖️ Egalite des voix - personne n'est elimine aujourd'hui.");
+    if (villageChannel) await narrate(guild.id, villageChannel, "⚖️ Égalité des voix - personne n'est éliminé aujourd'hui.");
     await beginNight(client, guild, game);
     return;
   }
@@ -656,7 +700,7 @@ async function resolveVillageVote(client: Client, guild: Guild, game: LoupGarouG
   const dead = applyDeaths(game, [eliminated]);
   await playSoundEffect(guild.id, "death");
   const names = await Promise.all(dead.map((id) => nameWithRole(guild, game, id)));
-  if (villageChannel) await narrate(guild.id, villageChannel, `⚖️ Le village a voté. ${names.join(", ")} ${names.length > 1 ? "sont elimines" : "est elimine"}.`);
+  if (villageChannel) await narrate(guild.id, villageChannel, `⚖️ Le village a voté. ${names.join(", ")} ${names.length > 1 ? "sont éliminés" : "est éliminé"}.`);
 
   const winner = checkWinner(game);
   if (winner) {
@@ -697,7 +741,7 @@ async function endGameWithWinner(client: Client, guild: Guild, game: LoupGarouGa
     await narrate(
       guild.id,
       villageChannel,
-      winner === "LOUPS" ? "🐺 Les loups ont devore tout le village..." : "🏘️ Le village a elimine tous les loups !",
+      winner === "LOUPS" ? "🐺 Les loups ont dévoré tout le village..." : "🏘️ Le village a éliminé tous les loups !",
     );
     await villageChannel.send({ embeds: [embed] }).catch(() => null);
   }
@@ -721,7 +765,7 @@ async function endGameWithWinner(client: Client, guild: Guild, game: LoupGarouGa
     const minutes = Math.round(POST_GAME_DEBRIEF_MS / 60_000);
     await villageChannel
       .send(
-        `🎤 Tina quitte le vocal, mais les salons restent ouverts encore **${minutes} minutes** pour debriefer entre vous. Vous serez ensuite renvoyes dans vos salons d'origine.`,
+        `💬 Les salons restent ouverts encore **${minutes} minutes** pour debriefer entre vous. Vous serez ensuite renvoyés dans vos salons d'origine.`,
       )
       .catch(() => null);
   }
@@ -740,6 +784,7 @@ async function cleanupGame(client: Client, guild: Guild, game: LoupGarouGame): P
     await setPlayersMuted(guild, [...game.players.keys()], false);
     await restoreOriginalChannels(guild, game.originalVoiceChannels);
     createdChannelsByGuild.delete(guild.id);
+    await cleanupPrivateChannels(guild, game.privateTextChannels);
     await cleanupChannels(guild, channels);
 
     leaveNarratorChannel(guild.id);

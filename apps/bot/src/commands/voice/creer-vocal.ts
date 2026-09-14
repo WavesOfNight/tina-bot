@@ -1,31 +1,24 @@
-import { ChannelType, EmbedBuilder, PermissionFlagsBits, Routes, SlashCommandBuilder, type User } from "discord.js";
+import { ActionRowBuilder, ChannelType, EmbedBuilder, PermissionFlagsBits, Routes, SlashCommandBuilder, UserSelectMenuBuilder } from "discord.js";
 import { prisma } from "@tina/database";
 import type { Command } from "../../types.js";
 import { findChannelNameViolation } from "../../lib/hub-voice.js";
 
-const MAX_ALLOWED_MEMBERS = 5;
-
 const command: Command = {
   data: new SlashCommandBuilder()
     .setName("creer-vocal")
-    .setDescription("Cree ton propre salon vocal personnalise et t'y deplace")
-    .addStringOption((opt) => opt.setName("nom").setDescription("Nom du salon (par defaut : ton pseudo)").setMaxLength(100))
+    .setDescription("Crée ton propre salon vocal personnalisé et t'y déplace")
+    .addStringOption((opt) => opt.setName("nom").setDescription("Nom du salon (par défaut : ton pseudo)").setMaxLength(100))
     .addIntegerOption((opt) =>
-      opt.setName("limite").setDescription("Nombre maximum de personnes (0 ou vide = illimite)").setMinValue(0).setMaxValue(99),
+      opt.setName("limite").setDescription("Nombre maximum de personnes (0 ou vide = illimité)").setMinValue(0).setMaxValue(99),
     )
-    .addStringOption((opt) => opt.setName("description").setDescription("Description affichee sous le salon").setMaxLength(500))
-    .addUserOption((opt) => opt.setName("membre1").setDescription("Salon prive : n'autorise que ce membre (+ les suivants) a le rejoindre"))
-    .addUserOption((opt) => opt.setName("membre2").setDescription("Membre autorise supplementaire"))
-    .addUserOption((opt) => opt.setName("membre3").setDescription("Membre autorise supplementaire"))
-    .addUserOption((opt) => opt.setName("membre4").setDescription("Membre autorise supplementaire"))
-    .addUserOption((opt) => opt.setName("membre5").setDescription("Membre autorise supplementaire")),
+    .addStringOption((opt) => opt.setName("description").setDescription("Description affichée sous le salon").setMaxLength(500)),
   async execute(interaction) {
     if (!interaction.guild) return;
 
     const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
     const currentChannel = member?.voice.channel;
     if (!member || !currentChannel) {
-      await interaction.reply({ content: "Tu dois etre connecte a un salon vocal pour utiliser cette commande.", ephemeral: true });
+      await interaction.reply({ content: "Tu dois être connecté à un salon vocal pour utiliser cette commande.", ephemeral: true });
       return;
     }
 
@@ -35,7 +28,7 @@ const command: Command = {
     if (alreadyOwned) {
       await interaction.reply({
         content:
-          "Tu as deja un salon vocal personnalise actif - utilise-le, ou attends qu'il soit supprime (des qu'il se vide) avant d'en recreer un.",
+          "Tu as déjà un salon vocal personnalisé actif - utilise-le, ou attends qu'il soit supprimé (dès qu'il se vide) avant d'en recréer un.",
         ephemeral: true,
       });
       return;
@@ -44,16 +37,11 @@ const command: Command = {
     const name = (interaction.options.getString("nom") ?? `🔊 Salon de ${member.displayName}`).trim().slice(0, 100);
     const limit = interaction.options.getInteger("limite");
     const description = interaction.options.getString("description");
-    const allowedMembers: User[] = [];
-    for (let i = 1; i <= MAX_ALLOWED_MEMBERS; i++) {
-      const user = interaction.options.getUser(`membre${i}`);
-      if (user) allowedMembers.push(user);
-    }
 
     const nameViolation = await findChannelNameViolation(interaction.guild.id, name);
     if (nameViolation) {
       await interaction.reply({
-        content: `Ce nom de salon n'est pas autorise (terme filtre : "${nameViolation}"). Choisis-en un autre.`,
+        content: `Ce nom de salon n'est pas autorisé (terme filtré : "${nameViolation}"). Choisis-en un autre.`,
         ephemeral: true,
       });
       return;
@@ -62,7 +50,7 @@ const command: Command = {
       const descriptionViolation = await findChannelNameViolation(interaction.guild.id, description);
       if (descriptionViolation) {
         await interaction.reply({
-          content: `Cette description n'est pas autorisee (terme filtre : "${descriptionViolation}"). Choisis-en une autre.`,
+          content: `Cette description n'est pas autorisée (terme filtré : "${descriptionViolation}"). Choisis-en une autre.`,
           ephemeral: true,
         });
         return;
@@ -71,10 +59,9 @@ const command: Command = {
 
     await interaction.deferReply({ ephemeral: true });
 
-    const everyoneId = interaction.guild.roles.everyone.id;
-    const botId = interaction.guild.members.me?.id;
-    const isPrivate = allowedMembers.length > 0;
-
+    // Public par defaut, comme les autres salons personnalises - l'acces peut ensuite
+    // etre restreint a des membres precis via le menu ci-dessous (voir creervocal.ts,
+    // gestionnaire de UserSelectMenu).
     const channel = await interaction.guild.channels
       .create({
         name,
@@ -86,19 +73,12 @@ const command: Command = {
             id: interaction.user.id,
             allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.MoveMembers],
           },
-          ...(isPrivate
-            ? [
-                { id: everyoneId, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] },
-                ...(botId ? [{ id: botId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] }] : []),
-                ...allowedMembers.map((u) => ({ id: u.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] })),
-              ]
-            : []),
         ],
       })
       .catch(() => null);
 
     if (!channel) {
-      await interaction.editReply("Impossible de creer le salon (verifie que j'ai la permission Gerer les salons).");
+      await interaction.editReply("Impossible de créer le salon (vérifie que j'ai la permission Gérer les salons).");
       return;
     }
 
@@ -106,23 +86,30 @@ const command: Command = {
     await member.voice.setChannel(channel.id).catch(() => null);
 
     if (description) {
-      // "Statut" du salon vocal (fonctionnalite Discord recente) - pas encore wrappee par
-      // discord.js, d'ou l'appel REST direct. Best-effort : ne bloque jamais la commande.
+      // "Statut" du salon vocal (fonctionnalité Discord récente) - pas encore wrappée par
+      // discord.js, d'où l'appel REST direct. Best-effort : ne bloque jamais la commande.
       await interaction.client.rest.put(Routes.channelVoiceStatus(channel.id), { body: { status: description } }).catch(() => null);
     }
 
     const embed = new EmbedBuilder()
       .setColor(0x7f77dd)
-      .setTitle("🔊 Salon vocal cree !")
+      .setTitle("🔊 Salon vocal créé !")
       .addFields(
         { name: "Nom", value: name, inline: true },
-        { name: "Limite", value: limit ? `${limit} membre(s)` : "Illimitee", inline: true },
-        { name: "Acces", value: isPrivate ? allowedMembers.map((u) => `<@${u.id}>`).join(", ") : "Tout le monde", inline: true },
+        { name: "Limite", value: limit ? `${limit} membre(s)` : "Illimitée", inline: true },
+        { name: "Accès", value: "Tout le monde", inline: true },
       );
     if (description) embed.addFields({ name: "Description", value: description });
-    embed.setFooter({ text: "Renommage/parametres geres directement depuis Discord - le salon est supprime des qu'il se vide." });
+    embed.setFooter({ text: "Renommage/paramètres gérés directement depuis Discord - le salon est supprimé dès qu'il se vide." });
 
-    await interaction.editReply({ embeds: [embed] });
+    const restrictMenu = new UserSelectMenuBuilder()
+      .setCustomId(`creervocal:restrict:${channel.id}`)
+      .setPlaceholder("Optionnel : restreindre l'accès à des membres précis")
+      .setMinValues(0)
+      .setMaxValues(25);
+    const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(restrictMenu);
+
+    await interaction.editReply({ embeds: [embed], components: [row] });
   },
 };
 

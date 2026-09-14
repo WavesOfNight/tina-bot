@@ -34,7 +34,7 @@ const handler: ButtonHandler = {
         return;
       }
       if (game.lobbyPlayerIds.has(interaction.user.id)) {
-        await interaction.reply({ content: "Tu es deja inscrit !", ephemeral: true });
+        await interaction.reply({ content: "Tu es déjà inscrit !", ephemeral: true });
         return;
       }
       game.lobbyPlayerIds.add(interaction.user.id);
@@ -51,10 +51,10 @@ const handler: ButtonHandler = {
         return;
       }
       if (interaction.user.id !== game.hostId) {
-        await interaction.reply({ content: "Seul l'organisateur peut demarrer la partie maintenant.", ephemeral: true });
+        await interaction.reply({ content: "Seul l'organisateur peut démarrer la partie maintenant.", ephemeral: true });
         return;
       }
-      await interaction.reply({ content: "Demarrage en cours...", ephemeral: true });
+      await interaction.reply({ content: "Démarrage en cours...", ephemeral: true });
       await closeLobby(interaction.client, guild, game);
       return;
     }
@@ -68,7 +68,7 @@ const handler: ButtonHandler = {
         await interaction.reply({ content: "Seul l'organisateur peut annuler la partie.", ephemeral: true });
         return;
       }
-      await interaction.update({ content: "❌ Partie annulee par l'organisateur.", embeds: [], components: [] });
+      await interaction.update({ content: "❌ Partie annulée par l'organisateur.", embeds: [], components: [] });
       await forceStopGame(interaction.client, guild, game);
       return;
     }
@@ -80,13 +80,13 @@ const handler: ButtonHandler = {
 
     if (action === "wolfvote") {
       const ok = await handleWolfVote(interaction.client, guild, game, interaction.user.id, arg);
-      await interaction.reply({ content: ok ? "🐺 Vote enregistre." : "Tu ne peux pas voter ici.", ephemeral: true });
+      await interaction.reply({ content: ok ? "🐺 Vote enregistré." : "Tu ne peux pas voter ici.", ephemeral: true });
       return;
     }
 
     if (action === "villagevote") {
       const ok = await handleVillageVote(interaction.client, guild, game, interaction.user.id, arg);
-      await interaction.reply({ content: ok ? "🗳️ Vote enregistre." : "Tu ne peux pas voter (tu es peut-etre elimine).", ephemeral: true });
+      await interaction.reply({ content: ok ? "🗳️ Vote enregistré." : "Tu ne peux pas voter (tu es peut-être éliminé).", ephemeral: true });
       return;
     }
 
@@ -95,7 +95,7 @@ const handler: ButtonHandler = {
         await interaction.reply({ content: "Ce n'est pas ton action.", ephemeral: true });
         return;
       }
-      await interaction.reply({ content: "💘 Choix enregistre.", ephemeral: true });
+      await interaction.reply({ content: "💘 Choix enregistré.", ephemeral: true });
       if (action === "cupid1") await handleCupidPick1(interaction.client, guild, game, arg);
       else await handleCupidPick2(interaction.client, guild, game, arg);
       return;
@@ -108,7 +108,7 @@ const handler: ButtonHandler = {
       }
       const role = await handleVoyantePick(guild, game, interaction.user.id, arg);
       if (!role) {
-        await interaction.reply({ content: "Action impossible (le tour est peut-etre deja passe).", ephemeral: true });
+        await interaction.reply({ content: "Action impossible (le tour est peut-être déjà passé).", ephemeral: true });
         return;
       }
       await interaction.reply({ content: `🔮 Ce joueur est **${ROLES[role].name}** !`, ephemeral: true });
@@ -121,7 +121,7 @@ const handler: ButtonHandler = {
         await interaction.reply({ content: "Ce n'est pas ton action.", ephemeral: true });
         return;
       }
-      await interaction.reply({ content: "🧪 Choix enregistre.", ephemeral: true });
+      await interaction.reply({ content: "🧪 Choix enregistré.", ephemeral: true });
       const witchAction = action === "witchsave" ? "save" : action === "witchpoison" ? "poison" : "skip";
       await handleWitchAction(interaction.client, guild, game, witchAction, action === "witchskip" ? null : arg);
       return;
@@ -133,7 +133,7 @@ const handler: ButtonHandler = {
         await interaction.reply({ content: "Ce n'est pas ton action.", ephemeral: true });
         return;
       }
-      await interaction.reply({ content: "🏹 Tir enregistre.", ephemeral: true });
+      await interaction.reply({ content: "🏹 Tir enregistré.", ephemeral: true });
       await handleChasseurShot(interaction.client, guild, game, arg);
       return;
     }
