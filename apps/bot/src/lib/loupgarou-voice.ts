@@ -12,7 +12,7 @@ import {
 } from "@discordjs/voice";
 import type { Client, GuildTextBasedChannel } from "discord.js";
 import { fileURLToPath } from "node:url";
-import { synthesizeSpeech, type BackgroundLayer } from "./tts.js";
+import { synthesizeSpeech } from "./tts.js";
 
 // Sources (toutes CC0 sauf mention contraire) : Field_cricket_unedited.ogg (Thatcher,
 // CC BY-SA 3.0, Wikimedia Commons), knife-blade-3, cock-song-1, archery, water-bubble-2
@@ -32,20 +32,14 @@ const SOUND_EFFECTS = {
 export type SoundEffect = keyof typeof SOUND_EFFECTS;
 
 // Fond sonore melange sous la voix pendant la nuit/le jour : ambiance (vent nocturne,
-// place de village - BigSoundBank CC0) + musique douce fournie par l'utilisateur.
-const AMBIANCE_VOLUME = 0.15;
-const MUSIC_VOLUME = 0.12;
-
-const AMBIANCES: Record<"night" | "day", BackgroundLayer[]> = {
-  night: [
-    { path: fileURLToPath(new URL("../../assets/sfx/ambiance-night.mp3", import.meta.url)), volume: AMBIANCE_VOLUME },
-    { path: fileURLToPath(new URL("../../assets/music/night.mp3", import.meta.url)), volume: MUSIC_VOLUME },
-  ],
-  day: [
-    { path: fileURLToPath(new URL("../../assets/sfx/ambiance-day.mp3", import.meta.url)), volume: AMBIANCE_VOLUME },
-    { path: fileURLToPath(new URL("../../assets/music/day.mp3", import.meta.url)), volume: MUSIC_VOLUME },
-  ],
-};
+// place de village - BigSoundBank CC0) + musique douce fournie par l'utilisateur, deja
+// pre-melangees ensemble en un seul fichier (voir apps/bot/assets/sfx, prepare a l'avance
+// avec ffmpeg) - un graphe de filtres a 3 entrees en temps reel (voix + 2 fonds sonores
+// separes) s'est avere peu fiable en production, d'ou ce pre-melange en amont.
+const AMBIANCES = {
+  night: fileURLToPath(new URL("../../assets/sfx/background-night.mp3", import.meta.url)),
+  day: fileURLToPath(new URL("../../assets/sfx/background-day.mp3", import.meta.url)),
+} as const;
 
 export type Ambiance = keyof typeof AMBIANCES | null;
 
@@ -145,8 +139,8 @@ export async function say(guildId: string, text: string): Promise<void> {
   const spoken = stripForSpeech(text);
   if (!spoken) return;
   try {
-    const background = session.ambiance ? AMBIANCES[session.ambiance] : [];
-    const resource = await synthesizeSpeech(spoken, undefined, background);
+    const backgroundPath = session.ambiance ? AMBIANCES[session.ambiance] : undefined;
+    const resource = await synthesizeSpeech(spoken, undefined, backgroundPath);
     await playAndWait(session.player, resource);
   } catch (error) {
     console.error(`Echec de la synthese vocale (guilde ${guildId})`, error);

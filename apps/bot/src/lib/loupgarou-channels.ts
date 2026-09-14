@@ -37,8 +37,10 @@ export async function setupChannels(guild: Guild, playerIds: string[]): Promise<
   // Un seul salon vocal pour toute la partie : personne n'est jamais deplace pendant la
   // nuit, sinon voir les loups disparaitre du salon commun reveille instantanement qui
   // ils sont. Leur vote reste prive via un salon TEXTE cache, sans equivalent vocal.
+  // "village" (public) et "loups-garous" (prive) sont deliberement tres differents -
+  // "loup-garou" et "loups-garous" cote a cote dans la liste des salons est illisible.
   const villageVoice = await guild.channels.create({ name: "🏘️ Village", type: ChannelType.GuildVoice, parent: category.id }).catch(() => null);
-  const actionsText = await guild.channels.create({ name: "loup-garou", type: ChannelType.GuildText, parent: category.id }).catch(() => null);
+  const actionsText = await guild.channels.create({ name: "village", type: ChannelType.GuildText, parent: category.id }).catch(() => null);
   const wolvesText = await guild.channels
     .create({
       name: "loups-garous",
