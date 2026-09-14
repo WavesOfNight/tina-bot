@@ -1,4 +1,4 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type Client, type Guild } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type Client, type Guild, type GuildMember } from "discord.js";
 import { prisma } from "@tina/database";
 import { ROLES, assignRoles, type RoleId } from "./loupgarou-roles.js";
 import {
@@ -69,22 +69,29 @@ async function getTextChannel(guild: Guild, channelId: string | null) {
 // Envoie un prompt d'action de nuit (role solo : Voyante, Sorciere, Cupidon, Chasseur)
 // dans le salon texte prive du joueur plutot qu'en MP - contrairement au MP de reveal du
 // role au tout debut de la partie, qui lui reste un vrai message prive (voir startGame).
-// Ne fait rien pour un faux joueur (member est alors null) ni si la partie n'a pas de
-// categorie (setup des salons echoue - ne devrait jamais arriver ici).
+// Si la creation du salon prive echoue pour une raison quelconque (permissions, souci
+// Discord passager...), on retombe sur un vrai MP plutot que de laisser le prompt
+// disparaitre silencieusement - un joueur ne doit jamais se retrouver sans son bouton.
 async function sendPrivatePrompt(
   guild: Guild,
   game: LoupGarouGame,
-  userId: string,
-  displayNameText: string,
+  member: GuildMember,
   payload: { content: string; components?: ActionRowBuilder<ButtonBuilder>[] },
 ): Promise<void> {
-  if (!game.categoryId) return;
-  const result = await getOrCreatePrivateChannel(guild, game.categoryId, userId, displayNameText, game.privateTextChannels);
-  if (!result) return;
+  const result = game.categoryId
+    ? await getOrCreatePrivateChannel(guild, game.categoryId, member.id, member.displayName, game.privateTextChannels)
+    : null;
+
+  if (!result) {
+    console.error(`Repli sur MP pour ${member.id} (guilde ${guild.id}) - salon prive indisponible`);
+    await member.send(payload).catch((error) => console.error(`Echec du MP de repli pour ${member.id} (guilde ${guild.id})`, error));
+    return;
+  }
+
   if (result.isNew) {
     await result.channel.send("🔒 Ce salon est privé - toi seul peux le voir. Tes actions de nuit s'y dérouleront.").catch(() => null);
   }
-  await result.channel.send(payload).catch(() => null);
+  await result.channel.send(payload).catch((error) => console.error(`Echec d'envoi dans le salon prive de ${member.id} (guilde ${guild.id})`, error));
 }
 
 function scheduleTimeout(game: LoupGarouGame, fn: () => void, ms: number): void {
@@ -266,7 +273,7 @@ async function startCupidStep(client: Client, guild: Guild, game: LoupGarouGame)
     .map((p) => p.userId);
   const buttons = await playerButtons(guild, targets, "loupgarou:cupid1");
   if (member) {
-    await sendPrivatePrompt(guild, game, cupid.userId, member.displayName, {
+    await sendPrivatePrompt(guild, game, member, {
       content: "💘 Tu es Cupidon. Choisis le **premier** amoureux :",
       components: chunkRows(buttons),
     });
@@ -296,7 +303,7 @@ export async function handleCupidPick1(client: Client, guild: Guild, game: LoupG
     .map((p) => p.userId);
   const buttons = await playerButtons(guild, targets, "loupgarou:cupid2");
   if (member) {
-    await sendPrivatePrompt(guild, game, cupid.userId, member.displayName, {
+    await sendPrivatePrompt(guild, game, member, {
       content: "💘 Choisis le **second** amoureux :",
       components: chunkRows(buttons),
     });
@@ -323,7 +330,7 @@ export async function handleCupidPick2(client: Client, guild: Guild, game: LoupG
     if (!member) continue;
     const otherId = loverOf(game, userId);
     const otherName = otherId ? await displayName(guild, otherId) : "quelqu'un";
-    await sendPrivatePrompt(guild, game, userId, member.displayName, {
+    await sendPrivatePrompt(guild, game, member, {
       content: `💘 Cupidon a fait de toi et **${otherName}** des amoureux. Si l'un de vous meurt, l'autre meurt de chagrin aussitôt.`,
     });
   }
@@ -440,7 +447,7 @@ async function runVoyanteStep(client: Client, guild: Guild, game: LoupGarouGame)
     .map((p) => p.userId);
   const buttons = await playerButtons(guild, targets, "loupgarou:voyante");
   if (member) {
-    await sendPrivatePrompt(guild, game, voyante.userId, member.displayName, {
+    await sendPrivatePrompt(guild, game, member, {
       content: "🔮 Choisis un joueur à sonder cette nuit :",
       components: chunkRows(buttons),
     });
@@ -508,7 +515,7 @@ async function runSorciereStep(client: Client, guild: Guild, game: LoupGarouGame
   const intro = game.pendingNightVictim
     ? `🧪 Les loups ont choisi de dévorer **${victimName}** cette nuit. Que fais-tu ?`
     : "🧪 Les loups n'ont mangé personne cette nuit. Veux-tu empoisonner quelqu'un ?";
-  if (member) await sendPrivatePrompt(guild, game, sorciere.userId, member.displayName, { content: intro, components: chunkRows(buttons) });
+  if (member) await sendPrivatePrompt(guild, game, member, { content: intro, components: chunkRows(buttons) });
 
   scheduleTimeout(game, () => void resolveNight(client, guild, game), ROLE_ACTION_MS);
 }
@@ -620,7 +627,7 @@ async function promptChasseurRevenge(
   const member = await guild.members.fetch(chasseurId).catch(() => null);
   const buttons = await playerButtons(guild, targets, "loupgarou:chasseur", ButtonStyle.Danger);
   if (member) {
-    await sendPrivatePrompt(guild, game, chasseurId, member.displayName, {
+    await sendPrivatePrompt(guild, game, member, {
       content: "🏹 Tu es mort, mais avant de partir tu peux tirer sur quelqu'un !",
       components: chunkRows(buttons),
     });

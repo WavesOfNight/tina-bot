@@ -154,7 +154,10 @@ export async function getOrCreatePrivateChannel(
         ...(botId ? [{ id: botId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }] : []),
       ],
     })
-    .catch(() => null);
+    .catch((error) => {
+      console.error(`Echec de creation du salon prive pour ${userId} (guilde ${guild.id})`, error);
+      return null;
+    });
   if (!channel) return null;
 
   privateTextChannels.set(userId, channel.id);
