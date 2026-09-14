@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getBotConfig, prisma } from "@tina/database";
 import { getGuildChannels } from "@/lib/discord";
 import { PageHeader } from "@/components/PageHeader";
@@ -23,6 +24,19 @@ async function addAlert(guildId: string, formData: FormData) {
   revalidatePath(`/dashboard/${guildId}/alertes`);
 }
 
+async function updateAlert(guildId: string, id: number, formData: FormData) {
+  "use server";
+  const platform = (formData.get("platform") as string) === "TWITCH" ? "TWITCH" : "YOUTUBE";
+  const channelRef = (formData.get("channelRef") as string)?.trim();
+  const discordChannelId = formData.get("discordChannelId") as string;
+  const message = (formData.get("message") as string)?.trim() || "{channel} vient de publier du nouveau contenu ! {url}";
+  if (!channelRef || !discordChannelId) return;
+
+  await prisma.socialAlert.update({ where: { id }, data: { platform, channelRef, discordChannelId, message } });
+  revalidatePath(`/dashboard/${guildId}/alertes`);
+  redirect(`/dashboard/${guildId}/alertes`);
+}
+
 async function deleteAlert(guildId: string, id: number) {
   "use server";
   await prisma.socialAlert.delete({ where: { id } });
@@ -40,7 +54,13 @@ async function saveStatsChannel(guildId: string, formData: FormData) {
   revalidatePath(`/dashboard/${guildId}/alertes`);
 }
 
-export default async function AlertesPage({ params }: { params: { guildId: string } }) {
+export default async function AlertesPage({
+  params,
+  searchParams,
+}: {
+  params: { guildId: string };
+  searchParams: { edit?: string };
+}) {
   const guildId = params.guildId;
   const [alerts, channels, voiceChannels, guild, botConfig] = await Promise.all([
     prisma.socialAlert.findMany({ where: { guildId }, orderBy: { createdAt: "desc" } }),
@@ -51,7 +71,8 @@ export default async function AlertesPage({ params }: { params: { guildId: strin
   ]);
 
   const twitchAvailable = Boolean(botConfig?.twitchClientId && botConfig.twitchClientSecret);
-  const add = addAlert.bind(null, guildId);
+  const editingAlert = searchParams.edit ? (alerts.find((a) => a.id === Number(searchParams.edit)) ?? null) : null;
+  const formAction = editingAlert ? updateAlert.bind(null, guildId, editingAlert.id) : addAlert.bind(null, guildId);
   const saveStats = saveStatsChannel.bind(null, guildId);
 
   return (
@@ -87,21 +108,43 @@ export default async function AlertesPage({ params }: { params: { guildId: strin
         {twitchAvailable ? "(configure ✅)" : "(non configure ⚠️)"} .
       </p>
 
-      <form action={add} className="glass-panel mb-4 flex flex-wrap items-end gap-3 rounded-aero p-5 shadow-glass">
+      {editingAlert && (
+        <div className="mb-3 rounded-xl bg-lavender-100 px-4 py-2 text-sm text-lavender-800">
+          ✏️ Modification de l&apos;alerte {editingAlert.platform === "YOUTUBE" ? "▶️ YouTube" : "🟣 Twitch"} -{" "}
+          {editingAlert.channelRef}
+        </div>
+      )}
+
+      <form action={formAction} className="glass-panel mb-4 flex flex-wrap items-end gap-3 rounded-aero p-5 shadow-glass">
         <div>
           <label className="mb-1 block text-xs text-lavender-600">Plateforme</label>
-          <select name="platform" className="rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm">
+          <select
+            name="platform"
+            defaultValue={editingAlert?.platform ?? "YOUTUBE"}
+            className="rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+          >
             <option value="YOUTUBE">YouTube</option>
             <option value="TWITCH">Twitch</option>
           </select>
         </div>
         <div>
           <label className="mb-1 block text-xs text-lavender-600">ID de chaine YouTube / pseudo Twitch</label>
-          <input name="channelRef" required placeholder="UCxxxxxxx ou pseudo_twitch" className="rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+          <input
+            name="channelRef"
+            required
+            defaultValue={editingAlert?.channelRef ?? ""}
+            placeholder="UCxxxxxxx ou pseudo_twitch"
+            className="rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+          />
         </div>
         <div>
           <label className="mb-1 block text-xs text-lavender-600">Salon Discord</label>
-          <select name="discordChannelId" required className="rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm">
+          <select
+            name="discordChannelId"
+            required
+            defaultValue={editingAlert?.discordChannelId ?? ""}
+            className="rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+          >
             {channels.map((c) => (
               <option key={c.id} value={c.id}>
                 # {c.name}
@@ -111,11 +154,21 @@ export default async function AlertesPage({ params }: { params: { guildId: strin
         </div>
         <div className="flex-1">
           <label className="mb-1 block text-xs text-lavender-600">Message</label>
-          <input name="message" placeholder="{channel} vient de publier du nouveau contenu ! {url}" className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm" />
+          <input
+            name="message"
+            defaultValue={editingAlert?.message ?? ""}
+            placeholder="{channel} vient de publier du nouveau contenu ! {url}"
+            className="w-full rounded-xl border border-lavender-200 bg-white/80 px-3 py-2 text-sm"
+          />
         </div>
         <button type="submit" className="bubble-btn rounded-full bg-aqua-400 px-5 py-2 text-sm font-medium text-white shadow-glass">
-          Ajouter
+          {editingAlert ? "Enregistrer les modifications" : "Ajouter"}
         </button>
+        {editingAlert && (
+          <a href={`/dashboard/${guildId}/alertes`} className="rounded-full bg-lavender-100 px-5 py-2 text-sm font-medium text-lavender-700">
+            Annuler
+          </a>
+        )}
       </form>
 
       <div className="glass-panel rounded-aero p-2 shadow-glass">
@@ -127,12 +180,18 @@ export default async function AlertesPage({ params }: { params: { guildId: strin
                 {a.platform === "YOUTUBE" ? "▶️ YouTube" : "🟣 Twitch"} - {a.channelRef}
               </p>
               <p className="text-sm text-lavender-600">→ {"#"}{channels.find((c) => c.id === a.discordChannelId)?.name ?? a.discordChannelId}</p>
+              <p className="mt-1 text-xs italic text-lavender-500">&quot;{a.message}&quot;</p>
             </div>
-            <form action={deleteAlert.bind(null, guildId, a.id)}>
-              <button type="submit" className="rounded-full bg-coral-100 px-3 py-1 text-xs font-medium text-coral-600">
-                Supprimer
-              </button>
-            </form>
+            <div className="flex shrink-0 items-center gap-2">
+              <a href={`/dashboard/${guildId}/alertes?edit=${a.id}`} className="rounded-full bg-lavender-100 px-3 py-1 text-xs font-medium text-lavender-700">
+                Editer
+              </a>
+              <form action={deleteAlert.bind(null, guildId, a.id)}>
+                <button type="submit" className="rounded-full bg-coral-100 px-3 py-1 text-xs font-medium text-coral-600">
+                  Supprimer
+                </button>
+              </form>
+            </div>
           </div>
         ))}
       </div>
