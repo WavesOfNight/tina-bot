@@ -12,7 +12,7 @@ import {
 } from "@discordjs/voice";
 import type { Client, GuildTextBasedChannel } from "discord.js";
 import { fileURLToPath } from "node:url";
-import { synthesizeSpeech } from "./tts.js";
+import { synthesizeSpeech, createLoopingAudioResource } from "./tts.js";
 
 // Sources (toutes CC0 sauf mention contraire) : Field_cricket_unedited.ogg (Thatcher,
 // CC BY-SA 3.0, Wikimedia Commons), knife-blade-3, cock-song-1, archery, water-bubble-2
@@ -31,6 +31,12 @@ const SOUND_EFFECTS = {
 
 export type SoundEffect = keyof typeof SOUND_EFFECTS;
 
+// Volume individuel de chaque effet (1 = volume d'origine du fichier) - le criquet est
+// nettement plus fort que les autres a l'origine, d'ou ce reglage a part.
+const SFX_VOLUME: Partial<Record<SoundEffect, number>> = {
+  night: 0.35,
+};
+
 // Musique de fond (fournie par l'utilisateur) melangee sous la voix pendant la nuit/le
 // jour - seule la voix + la musique, sans bruit d'ambiance superpose (les bruitages
 // comme le criquet ou le coq restent des effets ponctuels joues seuls via
@@ -41,6 +47,10 @@ const AMBIANCES = {
 } as const;
 
 export type Ambiance = keyof typeof AMBIANCES | null;
+
+// Plus fort que BACKGROUND_VOLUME (tts.ts) : la musique joue seule ici, sans voix a
+// couvrir, entre deux repliques ou pendant une pause.
+const AMBIANCE_LOOP_VOLUME = 0.5;
 
 interface NarratorSession {
   connection: VoiceConnection;
@@ -119,11 +129,26 @@ function stripForSpeech(text: string): string {
     .trim();
 }
 
-// Change l'ambiance sonore melangee sous les prochaines lignes parlees (null = aucune).
-// N'affecte pas les effets sonores ponctuels (playSoundEffect).
+// Relance la musique de fond en boucle seule (sans voix) sur le player - c'est ce qui la
+// fait continuer entre deux repliques ou pendant une pause au lieu de s'arreter des que
+// le TTS se tait. Jouer une nouvelle resource sur le player remplace silencieusement
+// celle en cours (pas d'evenement Idle emis) : cet appel n'interrompt donc jamais un
+// say()/playSoundEffect() deja en train de jouer, seulement le silence qui suivrait.
+function resumeAmbianceLoop(guildId: string): void {
+  const session = sessions.get(guildId);
+  if (!session?.ambiance) return;
+  const resource = createLoopingAudioResource(AMBIANCES[session.ambiance], AMBIANCE_LOOP_VOLUME);
+  session.player.play(resource);
+}
+
+// Change l'ambiance sonore de la partie (null = aucune) et relance aussitot la musique
+// correspondante en boucle. N'affecte pas les effets sonores ponctuels (playSoundEffect),
+// qui l'interrompent brievement avant qu'elle ne reprenne automatiquement.
 export function setAmbiance(guildId: string, ambiance: Ambiance): void {
   const session = sessions.get(guildId);
-  if (session) session.ambiance = ambiance;
+  if (!session) return;
+  session.ambiance = ambiance;
+  resumeAmbianceLoop(guildId);
 }
 
 // Joue la ligne en voix (best-effort, n'echoue jamais) - a utiliser seulement apres
@@ -143,6 +168,10 @@ export async function say(guildId: string, text: string): Promise<void> {
     await playAndWait(session.player, resource);
   } catch (error) {
     console.error(`Echec de la synthese vocale (guilde ${guildId})`, error);
+  } finally {
+    // La ligne est terminee (ou a echoue) - la musique doit continuer plutot que de
+    // s'arreter net avec elle.
+    resumeAmbianceLoop(guildId);
   }
 }
 
@@ -162,10 +191,14 @@ export async function playSoundEffect(guildId: string, effect: SoundEffect): Pro
     return;
   }
   try {
-    const resource = createAudioResource(SOUND_EFFECTS[effect]);
+    const resource = createAudioResource(SOUND_EFFECTS[effect], { inlineVolume: true });
+    resource.volume?.setVolume(SFX_VOLUME[effect] ?? 1);
     await playAndWait(session.player, resource);
   } catch (error) {
     console.error(`Echec de la lecture de l'effet sonore "${effect}" (guilde ${guildId})`, error);
+  } finally {
+    // L'effet est termine - la musique de fond (si active) doit reprendre derriere.
+    resumeAmbianceLoop(guildId);
   }
 }
 

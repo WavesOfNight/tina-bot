@@ -88,6 +88,14 @@ async function displayName(guild: Guild, userId: string): Promise<string> {
   return member?.displayName ?? "un joueur";
 }
 
+// Utilise dans les annonces de mort - reveler le role du joueur elimine est une regle
+// classique du Loup-Garou, pas seulement son nom.
+async function nameWithRole(guild: Guild, game: LoupGarouGame, userId: string): Promise<string> {
+  const name = await displayName(guild, userId);
+  const role = game.players.get(userId)?.role;
+  return role ? `${name} (${ROLES[role].name})` : name;
+}
+
 // ---------------------------------------------------------------------------
 // Lancement
 // ---------------------------------------------------------------------------
@@ -275,9 +283,10 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
   game.nightDeaths = [];
   game.phase = "NIGHT_WOLF_VOTE";
 
-  // Le signal sonore (criquets) annonce la nuit avant qu'on la decrive, pas apres.
-  await playSoundEffect(guild.id, "night");
+  // L'ambiance est fixee avant le signal sonore (criquets) pour que la musique de fond
+  // reprenne avec la bonne piste des que l'effet ponctuel se termine, pas l'ancienne.
   setAmbiance(guild.id, "night");
+  await playSoundEffect(guild.id, "night");
   const villageChannel = await getTextChannel(guild, game.channelId);
   if (villageChannel) await narrate(guild.id, villageChannel, `🌙 **Nuit ${game.nightNumber}** - Le village s'endort...`);
   await pause(2500);
@@ -474,17 +483,18 @@ async function announceDeathsAndContinue(
   dead: string[],
   onComplete: () => Promise<void> | void,
 ): Promise<void> {
-  // Le coq annonce le reveil avant qu'on le decrive ; le couteau (s'il y a une victime)
-  // vient ensuite comme un signal dramatique, juste avant la revelation parlee.
-  await playSoundEffect(guild.id, "dawn");
+  // Meme logique que pour la nuit : l'ambiance change avant l'effet sonore. Le coq
+  // annonce le reveil avant qu'on le decrive ; le couteau (s'il y a une victime) vient
+  // ensuite comme un signal dramatique, juste avant la revelation parlee.
   setAmbiance(guild.id, "day");
+  await playSoundEffect(guild.id, "dawn");
   const villageChannel = await getTextChannel(guild, game.channelId);
 
   if (dead.length === 0) {
     if (villageChannel) await narrate(guild.id, villageChannel, "☀️ Le village se reveille... et personne n'est mort cette nuit !");
   } else {
     await playSoundEffect(guild.id, "death");
-    const names = await Promise.all(dead.map((id) => displayName(guild, id)));
+    const names = await Promise.all(dead.map((id) => nameWithRole(guild, game, id)));
     if (villageChannel) {
       await narrate(guild.id, villageChannel, `☀️ Le village se reveille... ${names.join(", ")} ${names.length > 1 ? "sont morts" : "est mort"} cette nuit.`);
     }
@@ -553,7 +563,7 @@ async function resolveChasseurShot(client: Client, guild: Guild, game: LoupGarou
     const villageChannel = await getTextChannel(guild, game.channelId);
     if (dead.length > 0 && villageChannel) {
       await playSoundEffect(guild.id, "death");
-      const names = await Promise.all(dead.map((id) => displayName(guild, id)));
+      const names = await Promise.all(dead.map((id) => nameWithRole(guild, game, id)));
       await narrate(guild.id, villageChannel, `🏹 Le Chasseur tire sur ${names.join(", ")} en tombant !`);
     }
 
@@ -637,7 +647,7 @@ async function resolveVillageVote(client: Client, guild: Guild, game: LoupGarouG
 
   const dead = applyDeaths(game, [eliminated]);
   await playSoundEffect(guild.id, "death");
-  const names = await Promise.all(dead.map((id) => displayName(guild, id)));
+  const names = await Promise.all(dead.map((id) => nameWithRole(guild, game, id)));
   if (villageChannel) await narrate(guild.id, villageChannel, `⚖️ Le village a vote. ${names.join(", ")} ${names.length > 1 ? "sont elimines" : "est elimine"}.`);
 
   const winner = checkWinner(game);

@@ -13,9 +13,10 @@ function escapeSsmlText(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Volume du fond sonore (deja un melange ambiance+musique pre-fusionne en un seul
-// fichier - voir loupgarou-voice.ts) quand il est joue sous une ligne parlee.
-const BACKGROUND_VOLUME = 0.16;
+// Volume de la musique de fond (voir loupgarou-voice.ts) quand elle est melangee sous
+// une ligne parlee - plus basse que quand elle joue seule (voir AMBIANCE_LOOP_VOLUME)
+// pour que la voix reste bien audible par-dessus.
+const BACKGROUND_VOLUME = 0.28;
 
 export async function synthesizeSpeech(text: string, voice: string = NARRATOR_VOICE, backgroundPath?: string): Promise<AudioResource> {
   const tts = new MsEdgeTTS();
@@ -63,5 +64,36 @@ export async function synthesizeSpeech(text: string, voice: string = NARRATOR_VO
   });
   audioStream.pipe(ffmpeg);
 
+  return createAudioResource(ffmpeg, { inputType: StreamType.Raw });
+}
+
+// Musique de fond jouee en boucle infinie, independamment de toute ligne parlee - c'est
+// ce qui permet a l'ambiance de continuer sans interruption entre deux repliques (ou
+// pendant une pause) au lieu de couper des que le TTS s'arrete. Interrompue simplement en
+// jouant une autre resource sur le meme player (voir loupgarou-voice.ts).
+export function createLoopingAudioResource(path: string, volume: number): AudioResource {
+  const ffmpeg = new FFmpeg({
+    args: [
+      "-stream_loop",
+      "-1",
+      "-i",
+      path,
+      "-filter:a",
+      `volume=${volume}`,
+      "-analyzeduration",
+      "0",
+      "-loglevel",
+      "warning",
+      "-f",
+      "s16le",
+      "-ar",
+      "48000",
+      "-ac",
+      "2",
+    ],
+  });
+  (ffmpeg as any).process?.stderr?.on("data", (chunk: Buffer) => {
+    console.error(`[loupgarou-ambiance-ffmpeg] ${chunk.toString().trim()}`);
+  });
   return createAudioResource(ffmpeg, { inputType: StreamType.Raw });
 }
