@@ -41,7 +41,7 @@ const CATEGORIES = [
   },
   {
     name: "🎁 Serveur",
-    value: "`/giveaway` `/reactionrole` `/customcommand`",
+    value: "`/giveaway` `/reactionrole` `/customcommand` `/alertes verifier` (admin - rattrape les notifs YouTube/Twitch manquees)",
   },
   {
     name: "📻 Radio",

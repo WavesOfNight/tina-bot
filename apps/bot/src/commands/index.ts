@@ -42,6 +42,7 @@ import eightball from "./utility/8ball.js";
 import poll from "./utility/poll.js";
 import remindme from "./utility/remindme.js";
 import invite from "./utility/invite.js";
+import alertes from "./utility/alertes.js";
 import balance from "./economy/balance.js";
 import pay from "./economy/pay.js";
 import classementPieces from "./economy/classement-pieces.js";
@@ -91,6 +92,7 @@ export const commands: Command[] = [
   poll,
   remindme,
   invite,
+  alertes,
   balance,
   pay,
   classementPieces,

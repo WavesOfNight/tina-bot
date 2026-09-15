@@ -240,10 +240,30 @@ model SocialAlert {
   channelRef       String
   discordChannelId String
   message          String   @default("{channel} vient de publier du nouveau contenu ! {url}")
+  // Utilise seulement pour TWITCH (id du dernier live vu - un live est un evenement
+  // unique a la fois, pas d'historique a rattraper). YOUTUBE utilise NotifiedYoutubeVideo
+  // a la place, car plusieurs videos peuvent sortir entre deux verifications.
   lastSeenId       String?
   createdAt        DateTime @default(now())
 
+  notifiedVideos NotifiedYoutubeVideo[]
+
   @@unique([guildId, platform, channelRef])
+}
+
+// Historique des videos YouTube deja notifiees pour une alerte - garde une trace de
+// CHAQUE video (pas juste la derniere) pour pouvoir rattraper celles manquees (panne,
+// erreur d'envoi, plusieurs videos sorties entre deux verifications) sans jamais notifier
+// la meme video deux fois.
+model NotifiedYoutubeVideo {
+  id         Int         @id @default(autoincrement())
+  alert      SocialAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  alertId    Int
+  videoId    String
+  notifiedAt DateTime    @default(now())
+
+  @@unique([alertId, videoId])
+  @@index([alertId])
 }
 
 model CollabStory {

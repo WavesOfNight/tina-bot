@@ -37,8 +37,10 @@ export async function execute(client: Client<true>) {
   }, 15_000);
 
   setInterval(() => {
+    // 60s plutot que 180s : une requete RSS/API par alerte est legere, et l'ecart entre
+    // publication et notification comptait pour beaucoup dans le ressenti "pas instantane".
     checkSocialAlerts(client).catch((error) => console.error("Erreur lors de la verification des alertes sociales", error));
-  }, 180_000);
+  }, 60_000);
 
   setInterval(() => {
     updateStatsChannels(client).catch((error) => console.error("Erreur lors de la mise a jour des salons de stats", error));
