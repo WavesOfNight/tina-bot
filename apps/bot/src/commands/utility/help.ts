@@ -60,7 +60,6 @@ const command: Command = {
         "Tape `/` dans le chat pour voir la description et les options complètes de chaque commande. Tout est aussi configurable depuis le panel web.",
       )
       .addFields(...CATEGORIES)
-      .setFooter({ text: "Panel web disponible pour tout configurer sans code." })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
