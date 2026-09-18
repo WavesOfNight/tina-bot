@@ -20,7 +20,6 @@ import {
 } from "./loupgarou-store.js";
 import {
   setupChannels,
-  grantWolfAccess,
   moveMembersToChannel,
   restoreOriginalChannels,
   setPlayersMuted,
@@ -66,30 +65,41 @@ async function getTextChannel(guild: Guild, channelId: string | null) {
   return channel?.isTextBased() && !channel.isDMBased() ? channel : null;
 }
 
-// Envoie un prompt d'action de nuit (role solo : Voyante, Sorciere, Cupidon, Chasseur)
-// dans le salon texte prive du joueur plutot qu'en MP - contrairement au MP de reveal du
-// role au tout debut de la partie, qui lui reste un vrai message prive (voir startGame).
-// Si la creation du salon prive echoue pour une raison quelconque (permissions, souci
-// Discord passager...), on retombe sur un vrai MP plutot que de laisser le prompt
-// disparaitre silencieusement - un joueur ne doit jamais se retrouver sans son bouton.
+// Envoie un prompt d'action de nuit (role solo : Voyante, Sorciere, Cupidon, Chasseur, et
+// le vote des loups) en MP en priorite - comme le MP de reveal du role au tout debut de la
+// partie (voir startGame). C'est la SEULE option realiste sur Discord : un administrateur
+// ou le proprietaire du serveur voit toujours tous les salons de la guilde, quels que
+// soient les droits poses dessus (comportement de Discord, aucun overwrite ne peut le
+// contourner) - alors qu'un MP entre le bot et un membre leur reste invisible. Si le MP
+// echoue (bloque, DMs desactives...), on retombe sur un salon prive individuel plutot que
+// de perdre le prompt - un dernier recours moins confidentiel, mais mieux que rien.
 async function sendPrivatePrompt(
   guild: Guild,
   game: LoupGarouGame,
   member: GuildMember,
   payload: { content: string; components?: ActionRowBuilder<ButtonBuilder>[] },
 ): Promise<void> {
+  const dmSent = await member
+    .send(payload)
+    .then(() => true)
+    .catch((error) => {
+      console.error(`Echec du MP pour ${member.id} (guilde ${guild.id}) - repli sur un salon prive individuel`, error);
+      return false;
+    });
+  if (dmSent) return;
+
   const result = game.categoryId
     ? await getOrCreatePrivateChannel(guild, game.categoryId, member.id, member.displayName, game.privateTextChannels)
     : null;
-
   if (!result) {
-    console.error(`Repli sur MP pour ${member.id} (guilde ${guild.id}) - salon prive indisponible`);
-    await member.send(payload).catch((error) => console.error(`Echec du MP de repli pour ${member.id} (guilde ${guild.id})`, error));
+    console.error(`Echec total d'envoi du prompt pour ${member.id} (guilde ${guild.id}) - ni MP ni salon prive disponibles`);
     return;
   }
 
   if (result.isNew) {
-    await result.channel.send("🔒 Ce salon est privé - toi seul peux le voir. Tes actions de nuit s'y dérouleront.").catch(() => null);
+    await result.channel
+      .send("🔒 Ce salon est privé - toi seul peux le voir. Tes actions de nuit s'y dérouleront (tes MP semblent bloqués, d'où ce salon).")
+      .catch(() => null);
   }
   await result.channel.send(payload).catch((error) => console.error(`Echec d'envoi dans le salon prive de ${member.id} (guilde ${guild.id})`, error));
 }
@@ -167,7 +177,6 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
   createdChannelsByGuild.set(game.guildId, channels);
   game.categoryId = channels.categoryId;
   game.villageVoiceId = channels.villageVoiceId;
-  game.wolvesTextId = channels.wolvesTextId;
   game.channelId = channels.actionsTextId;
 
   // Retenu pour remettre chacun dans son salon d'origine a la fin de la partie (voir
@@ -177,11 +186,6 @@ export async function startGame(client: Client, guild: Guild, game: LoupGarouGam
     const member = await guild.members.fetch(userId).catch(() => null);
     game.originalVoiceChannels.set(userId, member?.voice.channelId ?? null);
   }
-
-  const wolfIds = alivePlayers(game)
-    .filter((p) => p.role === "LOUP_GAROU")
-    .map((p) => p.userId);
-  await grantWolfAccess(guild, channels.wolvesTextId, wolfIds);
 
   for (const player of game.players.values()) {
     if (isFakePlayer(player.userId)) continue;
@@ -356,7 +360,9 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
 
   // Tout le monde reste dans le meme salon vocal toute la partie, y compris les loups :
   // les deplacer vers un salon prive reviendrait a reveler publiquement qui ils sont des
-  // qu'ils disparaissent du salon commun. Leur vote reste prive via le salon texte cache.
+  // qu'ils disparaissent du salon commun. Leur vote est envoye individuellement en MP a
+  // chacun (voir sendPrivatePrompt) - un salon partage, meme verrouille, reste visible par
+  // un admin/le proprietaire du serveur sur Discord, ce qu'un MP n'est jamais.
   const wolves = aliveWolves(game).map((p) => p.userId);
 
   const targets = alivePlayers(game)
@@ -378,11 +384,17 @@ async function beginNight(client: Client, guild: Guild, game: LoupGarouGame): Pr
     return;
   }
 
-  const wolvesChannel = await getTextChannel(guild, game.wolvesTextId);
-  if (wolvesChannel) {
-    await narrate(guild.id, wolvesChannel, "🐺 Loups-garous, choisissez votre victime :");
-    const buttons = await playerButtons(guild, targets, "loupgarou:wolfvote", ButtonStyle.Danger);
-    await wolvesChannel.send({ components: chunkRows(buttons) }).catch(() => null);
+  const buttons = await playerButtons(guild, targets, "loupgarou:wolfvote", ButtonStyle.Danger);
+  for (const wolfId of wolves) {
+    if (isFakePlayer(wolfId)) continue;
+    const member = await guild.members.fetch(wolfId).catch(() => null);
+    if (!member) continue;
+    const teammateNames = await Promise.all(wolves.filter((id) => id !== wolfId).map((id) => displayName(guild, id)));
+    const intro =
+      teammateNames.length > 0
+        ? `🐺 Tu es Loup-Garou, avec **${teammateNames.join(", ")}**. Choisissez ensemble votre victime cette nuit :`
+        : "🐺 Tu es le seul Loup-Garou en vie cette nuit. Choisis ta victime :";
+    await sendPrivatePrompt(guild, game, member, { content: intro, components: chunkRows(buttons) });
   }
 
   scheduleTimeout(game, () => void resolveWolfVote(client, guild, game), WOLF_VOTE_MS);

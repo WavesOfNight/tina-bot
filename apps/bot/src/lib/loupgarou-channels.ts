@@ -4,7 +4,6 @@ import { isFakePlayer } from "./loupgarou-store.js";
 export interface CreatedChannels {
   categoryId: string;
   villageVoiceId: string;
-  wolvesTextId: string;
   actionsTextId: string;
 }
 
@@ -36,21 +35,18 @@ export async function setupChannels(guild: Guild, playerIds: string[]): Promise<
 
   // Un seul salon vocal pour toute la partie : personne n'est jamais deplace pendant la
   // nuit, sinon voir les loups disparaitre du salon commun reveille instantanement qui
-  // ils sont. Leur vote reste prive via un salon TEXTE cache, sans equivalent vocal.
-  // "village" (public) et "loups-garous" (prive) sont deliberement tres differents -
-  // "loup-garou" et "loups-garous" cote a cote dans la liste des salons est illisible.
+  // ils sont. Il n'y a plus de salon TEXTE partage pour le vote des loups (ni pour aucune
+  // autre action secrete) : sur Discord, un administrateur ou le proprietaire du serveur
+  // voit TOUJOURS tous les salons quels que soient les droits poses dessus - ce n'est pas
+  // un bug, c'est ainsi que Discord calcule les permissions, et aucun overwrite de salon
+  // ne peut le changer. Seul un MP leur est reellement invisible, donc tout ce qui doit
+  // rester secret (vote des loups compris) passe desormais par un MP en priorite (voir
+  // sendPrivatePrompt dans loupgarou-engine.ts), avec un salon prive individuel en simple
+  // filet de securite si le MP echoue.
   const villageVoice = await guild.channels.create({ name: "🏘️ Village", type: ChannelType.GuildVoice, parent: category.id }).catch(() => null);
   const actionsText = await guild.channels.create({ name: "village", type: ChannelType.GuildText, parent: category.id }).catch(() => null);
-  const wolvesText = await guild.channels
-    .create({
-      name: "loups-garous",
-      type: ChannelType.GuildText,
-      parent: category.id,
-      permissionOverwrites: [{ id: everyoneId, deny: [PermissionFlagsBits.ViewChannel] }],
-    })
-    .catch(() => null);
 
-  if (!villageVoice || !actionsText || !wolvesText) {
+  if (!villageVoice || !actionsText) {
     await category.delete().catch(() => null);
     return null;
   }
@@ -58,22 +54,8 @@ export async function setupChannels(guild: Guild, playerIds: string[]): Promise<
   return {
     categoryId: category.id,
     villageVoiceId: villageVoice.id,
-    wolvesTextId: wolvesText.id,
     actionsTextId: actionsText.id,
   };
-}
-
-// Autorise uniquement les loups a voir/ecrire dans leur salon texte prive (les autres
-// joueurs restent explicitement exclus meme s'ils ont acces a la categorie).
-export async function grantWolfAccess(guild: Guild, wolvesTextId: string, wolfUserIds: string[]): Promise<void> {
-  const textChannel = await guild.channels.fetch(wolvesTextId).catch(() => null);
-
-  for (const userId of wolfUserIds) {
-    if (isFakePlayer(userId)) continue;
-    if (textChannel?.type === ChannelType.GuildText) {
-      await textChannel.permissionOverwrites.create(userId, { ViewChannel: true, SendMessages: true }).catch(() => null);
-    }
-  }
 }
 
 export async function moveMembersToChannel(guild: Guild, userIds: string[], channelId: string | null): Promise<void> {
@@ -172,7 +154,7 @@ export async function cleanupPrivateChannels(guild: Guild, privateTextChannels: 
 }
 
 export async function cleanupChannels(guild: Guild, channels: CreatedChannels): Promise<void> {
-  const ids = [channels.wolvesTextId, channels.villageVoiceId, channels.actionsTextId, channels.categoryId];
+  const ids = [channels.villageVoiceId, channels.actionsTextId, channels.categoryId];
   for (const id of ids) {
     const channel = await guild.channels.fetch(id).catch(() => null);
     await channel?.delete().catch(() => null);
