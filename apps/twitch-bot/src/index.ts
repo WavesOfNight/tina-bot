@@ -166,6 +166,17 @@ async function buildSession(
     }
 
     if ((lowerMessage === `${config.prefix}followage` || lowerMessage === `${config.prefix}fc`) && loginName) {
+      // Easter egg pour th0masdu85 - remplace la reponse normale par une petite blague.
+      if (loginName.toLowerCase() === "th0masdu85") {
+        await client
+          .say(
+            channelArg,
+            `@${author} Ohlala, mais c'est une vraie relique préhistorique qu'on a là ! 🦖✨ Ça fait plus d'un siècle que tu es là, un vrai de vrai homme des cavernes ! 🍖📜`,
+          )
+          .catch(() => null);
+        return;
+      }
+
       const targetId = await getUserId(ctx, loginName).catch(() => null);
       const result = targetId ? await getFollowedAt(ctx, broadcasterId, targetId).catch(() => null) : null;
 
