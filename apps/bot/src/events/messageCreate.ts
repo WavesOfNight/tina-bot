@@ -1,5 +1,5 @@
 import { Events, type Message, type TextChannel } from "discord.js";
-import { prisma, findAutoModMatch, hasExcessiveCaps, isSpam, matchesInvite, matchesLink } from "@tina/database";
+import { prisma, findAutoModMatch, hasExcessiveCaps, isSpam, matchesInvite, matchesNonGifLink } from "@tina/database";
 import { grantMessageXp } from "../lib/xp.js";
 import { findAutoResponseMatch } from "../lib/auto-response.js";
 import { bombeRounds } from "../lib/bombe-store.js";
@@ -187,7 +187,7 @@ function detectAutoModViolation(
     if (matchedWord) return `mot filtre : "${matchedWord}"`;
   }
 
-  if (guildData.filterLinks && matchesLink(message.content)) return "lien externe non autorise";
+  if (guildData.filterLinks && matchesNonGifLink(message.content)) return "lien externe non autorise";
   if (guildData.filterInvites && matchesInvite(message.content)) return "invitation Discord non autorisee";
   if (guildData.filterCaps && hasExcessiveCaps(message.content)) return "majuscules excessives";
   if (guildData.filterSpam && isSpam(message.author.id, message.channelId, message.content)) return "spam de messages";

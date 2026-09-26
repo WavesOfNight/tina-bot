@@ -42,6 +42,28 @@ export function matchesLink(content: string): boolean {
   return extractLinks(content).length > 0;
 }
 
+// Domaines des services de GIF les plus courants - couvre notamment le bouton "GIF" natif
+// de Discord, qui insere un lien tenor.com brut dans le message (pas une piece jointe).
+const GIF_HOSTS = ["tenor.com", "media.tenor.com", "c.tenor.com", "giphy.com", "media.giphy.com", "i.giphy.com"];
+
+function isGifLink(url: string): boolean {
+  if (/\.gif(?:[?#]|$)/i.test(url)) return true;
+  try {
+    const withProtocol = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    const host = new URL(withProtocol).hostname.replace(/^www\./, "").toLowerCase();
+    return GIF_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+  } catch {
+    return false;
+  }
+}
+
+// Comme matchesLink, mais ignore les liens de GIF (Tenor/Giphy, dont le bouton GIF natif
+// de Discord, ou toute URL en .gif) - un GIF n'est pas le genre de lien externe (pub, spam,
+// phishing) que ce filtre vise a bloquer, meme s'il s'agit techniquement d'une URL.
+export function matchesNonGifLink(content: string): boolean {
+  return extractLinks(content).some((url) => !isGifLink(url));
+}
+
 export function matchesUnwhitelistedLink(content: string, whitelist: string[]): boolean {
   const links = extractLinks(content);
   if (links.length === 0) return false;
