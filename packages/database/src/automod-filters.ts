@@ -42,16 +42,29 @@ export function matchesLink(content: string): boolean {
   return extractLinks(content).length > 0;
 }
 
-// N'importe quel lien se terminant par .gif est autorise, quel que soit le site qui
-// l'heberge (pas seulement Tenor/Giphy) - la ponctuation collee juste apres (!, ., ), etc.
-// sans espace est tolerее, seul un autre caractere ou un chemin apres .gif invalide le
-// match.
-const GIF_EXTENSION_REGEX = /\.gif(?:[?#]|[!.,;:'")\]]*$)/i;
+// N'importe quel lien se terminant par une de ces extensions est autorise, quel que soit
+// le site qui l'heberge - les "GIF" partages par les selecteurs (Discord, Tenor, Klipy...)
+// sont tres souvent en realite des .mp4/.webm (plus legers qu'un vrai .gif), et Discord
+// lui-meme reecrit parfois le lien externe via son proxy images-ext-*.discordapp.net, mais
+// l'extension d'origine reste toujours a la fin de l'URL. La ponctuation collee juste apres
+// (!, ., ), etc.) sans espace est toleree ; un chemin apres l'extension invalide le match.
+const GIF_MEDIA_EXTENSIONS = ["gif", "mp4", "webm", "webp"];
+const GIF_EXTENSION_REGEX = new RegExp(`\\.(?:${GIF_MEDIA_EXTENSIONS.join("|")})(?:[?#]|[!.,;:'")\\]]*$)`, "i");
 
-// Domaines des services de GIF dont les pages ne se terminent PAS forcement par .gif -
-// couvre notamment le bouton "GIF" natif de Discord, qui insere un lien tenor.com/view/...
-// brut dans le message (pas une piece jointe, et pas d'extension .gif dans l'URL elle-meme).
-const GIF_HOSTS = ["tenor.com", "media.tenor.com", "c.tenor.com", "giphy.com", "media.giphy.com", "i.giphy.com"];
+// Domaines des services de GIF dont les pages ne se terminent PAS forcement par une de ces
+// extensions - couvre notamment le bouton "GIF" natif de Discord, qui insere un lien
+// tenor.com/view/... brut dans le message (pas une piece jointe, et sans extension dans
+// l'URL elle-meme).
+const GIF_HOSTS = [
+  "tenor.com",
+  "media.tenor.com",
+  "c.tenor.com",
+  "giphy.com",
+  "media.giphy.com",
+  "i.giphy.com",
+  "klipy.com",
+  "static.klipy.com",
+];
 
 function isGifLink(url: string): boolean {
   if (GIF_EXTENSION_REGEX.test(url)) return true;
@@ -64,9 +77,10 @@ function isGifLink(url: string): boolean {
   }
 }
 
-// Comme matchesLink, mais ignore les liens de GIF (Tenor/Giphy, dont le bouton GIF natif
-// de Discord, ou toute URL en .gif) - un GIF n'est pas le genre de lien externe (pub, spam,
-// phishing) que ce filtre vise a bloquer, meme s'il s'agit techniquement d'une URL.
+// Comme matchesLink, mais ignore les liens de GIF/clips courts (Tenor/Giphy/Klipy, dont le
+// bouton GIF natif de Discord, ou toute URL en .gif/.mp4/.webm/.webp) - ce n'est pas le
+// genre de lien externe (pub, spam, phishing) que ce filtre vise a bloquer, meme s'il
+// s'agit techniquement d'une URL.
 export function matchesNonGifLink(content: string): boolean {
   return extractLinks(content).some((url) => !isGifLink(url));
 }
