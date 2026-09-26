@@ -42,12 +42,19 @@ export function matchesLink(content: string): boolean {
   return extractLinks(content).length > 0;
 }
 
-// Domaines des services de GIF les plus courants - couvre notamment le bouton "GIF" natif
-// de Discord, qui insere un lien tenor.com brut dans le message (pas une piece jointe).
+// N'importe quel lien se terminant par .gif est autorise, quel que soit le site qui
+// l'heberge (pas seulement Tenor/Giphy) - la ponctuation collee juste apres (!, ., ), etc.
+// sans espace est tolerее, seul un autre caractere ou un chemin apres .gif invalide le
+// match.
+const GIF_EXTENSION_REGEX = /\.gif(?:[?#]|[!.,;:'")\]]*$)/i;
+
+// Domaines des services de GIF dont les pages ne se terminent PAS forcement par .gif -
+// couvre notamment le bouton "GIF" natif de Discord, qui insere un lien tenor.com/view/...
+// brut dans le message (pas une piece jointe, et pas d'extension .gif dans l'URL elle-meme).
 const GIF_HOSTS = ["tenor.com", "media.tenor.com", "c.tenor.com", "giphy.com", "media.giphy.com", "i.giphy.com"];
 
 function isGifLink(url: string): boolean {
-  if (/\.gif(?:[?#]|$)/i.test(url)) return true;
+  if (GIF_EXTENSION_REGEX.test(url)) return true;
   try {
     const withProtocol = /^https?:\/\//i.test(url) ? url : `https://${url}`;
     const host = new URL(withProtocol).hostname.replace(/^www\./, "").toLowerCase();
